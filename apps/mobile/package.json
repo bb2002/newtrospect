@@ -2,5 +2,23 @@
   "name": "@newtrospect/mobile",
   "version": "0.0.0",
   "private": true,
-  "description": "Expo Go + react-native-webview 안드로이드 앱"
+  "description": "Expo Go + react-native-webview 안드로이드 앱 (S1 spike 단계)",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~51.0.39",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-webview": "13.8.6"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.2.79",
+    "typescript": "^5.6.3"
+  }
 }

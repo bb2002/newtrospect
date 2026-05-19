@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "newtrospect-spike",
+    "slug": "newtrospect-spike",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "android": {
+      "package": "io.alignnetworks.newtrospect.spike"
+    },
+    "ios": {
+      "bundleIdentifier": "io.alignnetworks.newtrospect.spike",
+      "supportsTablet": false
+    }
+  }
+}
