@@ -1,0 +1,6 @@
+{
+  "name": "@newtrospect/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Expo Go + react-native-webview 안드로이드 앱"
+}

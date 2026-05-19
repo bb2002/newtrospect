@@ -1,0 +1,6 @@
+{
+  "name": "@newtrospect/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "본문 추출 · API 클라이언트 · 하이라이트 렌더링 공용 로직"
+}

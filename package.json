@@ -1,0 +1,17 @@
+{
+  "name": "newtrospect",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AI 기반 비판적 뉴스 읽기 보조 도구 (Chrome MV3 + Expo WebView + Cloudflare Workers)",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}
