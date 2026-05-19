@@ -1,0 +1,36 @@
+name = "newtrospect-worker"
+main = "src/index.ts"
+compatibility_date = "2026-05-19"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers AI
+[ai]
+binding = "AI"
+
+# D1: 본문 SHA-256 해시 기반 캐시 (Phase 1: 캐시 전용, UID 없음)
+# 생성 후 database_id 를 채워 넣을 것:
+#   npx wrangler d1 create newtrospect
+[[d1_databases]]
+binding = "DB"
+database_name = "newtrospect"
+database_id = "TBD-after-wrangler-d1-create"
+migrations_dir = "migrations"
+
+# endpoint 별 provider 매핑. S2 spike 후 갱신.
+[vars]
+PROVIDER_TERM = "workers-ai"
+PROVIDER_SENSATIONAL = "workers-ai"
+PROVIDER_QUANTITATIVE = "workers-ai"
+PROVIDER_CONTEXT = "workers-ai"
+
+# 모델 선택. S2 spike 후 결정. 후보:
+#   @cf/meta/llama-3.1-8b-instruct
+#   @cf/qwen/qwen1.5-14b-chat-awq
+#   @cf/google/gemma-2-9b-it
+MODEL_TERM = "@cf/meta/llama-3.1-8b-instruct"
+MODEL_SENSATIONAL = "@cf/meta/llama-3.1-8b-instruct"
+MODEL_QUANTITATIVE = "@cf/meta/llama-3.1-8b-instruct"
+MODEL_CONTEXT = "@cf/meta/llama-3.1-8b-instruct"
+
+# 캐시 TTL (초). 1시간.
+CACHE_TTL_SEC = "3600"

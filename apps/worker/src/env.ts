@@ -1,0 +1,44 @@
+import type { AnalysisKind } from "@newtrospect/core/server";
+
+export interface Env {
+  AI: Ai;
+  DB: D1Database;
+
+  PROVIDER_TERM: string;
+  PROVIDER_SENSATIONAL: string;
+  PROVIDER_QUANTITATIVE: string;
+  PROVIDER_CONTEXT: string;
+
+  MODEL_TERM: string;
+  MODEL_SENSATIONAL: string;
+  MODEL_QUANTITATIVE: string;
+  MODEL_CONTEXT: string;
+
+  CACHE_TTL_SEC: string;
+}
+
+const PROVIDER_KEY = {
+  term: "PROVIDER_TERM",
+  sensational: "PROVIDER_SENSATIONAL",
+  quantitative: "PROVIDER_QUANTITATIVE",
+  context: "PROVIDER_CONTEXT",
+} as const satisfies Record<AnalysisKind, keyof Env>;
+
+const MODEL_KEY = {
+  term: "MODEL_TERM",
+  sensational: "MODEL_SENSATIONAL",
+  quantitative: "MODEL_QUANTITATIVE",
+  context: "MODEL_CONTEXT",
+} as const satisfies Record<AnalysisKind, keyof Env>;
+
+export function providerFor(env: Env, kind: AnalysisKind): string {
+  return env[PROVIDER_KEY[kind]] as string;
+}
+
+export function modelFor(env: Env, kind: AnalysisKind): string {
+  return env[MODEL_KEY[kind]] as string;
+}
+
+export function cacheTtlSec(env: Env): number {
+  return Number(env.CACHE_TTL_SEC) || 3600;
+}
