@@ -1,6 +1,6 @@
 # newtrospect — 진행상황 (2026-05-19)
 
-> 갱신: 환경 준비물 완료. monorepo 스캐폴딩 + GitHub private repo (bb2002/newtrospect) 푸시 완료. 다음은 spike 3가지.
+> 갱신: 4개 패키지(core/worker/extension/mobile) 스캐폴딩 코드 완료, 전부 typecheck 통과, GitHub bb2002/newtrospect 푸시됨. 남은 건 *코드 외* 실행: D1 생성·spike 측정·실측.
 
 
 > 다른 세션에서 이 프로젝트를 이어갈 때 이 문서부터 읽으세요.
@@ -26,11 +26,56 @@
 
 다음 세션 시작 시 이 문서를 *반드시* 먼저 읽으세요. 모든 의사결정의 근거가 여기 있습니다.
 
-## 다음 액션 (우선순위 순)
+## 다음 액션 — 코드 외 실행 (우선순위 순)
 
-### Week 1: 코드 작성 전 spike (총 ~3시간)
+### 0. Cloudflare D1 생성 + wrangler 로그인 (10분, 사용자 직접)
 
-**과제 1: 셀렉터 실측 (30분)**
+```
+cd apps/worker
+npx wrangler login              # 인터랙티브 — 사용자 ! 명령
+npx wrangler d1 create newtrospect
+# 출력된 database_id 를 wrangler.toml 의 TBD 자리에 붙여넣기
+pnpm db:migrate:local           # 로컬 D1 마이그레이션 적용
+pnpm dev                        # 로컬 워커 띄우기 (포트 8787)
+```
+
+### 1. S2/S3 spike 실행 (1시간)
+
+워커가 떠 있는 상태에서 다른 터미널:
+
+```
+cd apps/worker
+pnpm spike:s2
+# spike-s2-results.json 생성됨
+```
+
+wrangler.toml 의 MODEL_* 를 후보 모델로 갈아가며 3회 반복. 결과를
+디자인 문서 (`~/.gstack/projects/newtrospect/ballbot-main-design-20260519-185536.md`)
+의 "Spike Results" 섹션에 옮긴다.
+
+### 2. 과제 1 — 셀렉터 실측 (30분, 사용자 직접)
+
+매일 보는 한국 뉴스 사이트 5곳 DevTools 로 본문 셀렉터 확인 →
+`packages/core/src/selectors.ts` 의 SITE_SELECTORS 객체를 실측값으로 교체.
+
+### 3. S1 spike — Expo Go (30~40분, 사용자 직접)
+
+```
+pnpm -F @newtrospect/mobile start
+# 폰 Expo Go 앱으로 QR 스캔
+# 화면 하단 로그 패널에서 3가지 검증:
+#   [inject]   주입 동작?
+#   [fetch]    cross-origin OK?
+#   [nav] / [pushState]   SPA 전환 감지?
+```
+
+결과를 디자인 문서 "Spike Results" 에 기록.
+
+---
+
+## 이전: Week 1 spike 가이드 (원본)
+
+### 과제 1: 셀렉터 실측 (30분)
 - 매일 보는 한국 뉴스 사이트 5곳 선정
 - 각 사이트에서 기사 본문을 정확히 감싸는 DOM 셀렉터를 DevTools로 확인
 - 결과를 디자인 문서 "Spike Results" 섹션에 기록
