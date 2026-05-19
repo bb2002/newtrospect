@@ -1,5 +1,8 @@
 # newtrospect — 진행상황 (2026-05-19)
 
+> 갱신: 환경 준비물 완료. monorepo 스캐폴딩 + GitHub private repo (bb2002/newtrospect) 푸시 완료. 다음은 spike 3가지.
+
+
 > 다른 세션에서 이 프로젝트를 이어갈 때 이 문서부터 읽으세요.
 
 ## 한 줄 상태
@@ -55,17 +58,17 @@
 
 - [ ] Workers AI 모델 최종 선택 (S2 결과 후)
 - [ ] Gemini 스왑 임계 조건 — 어떤 endpoint를 언제 갈아낄지 (S2 결과 후)
-- [ ] pnpm workspace 디렉토리 구조 (apps/extension, apps/mobile, packages/core 등)
-- [ ] git repo 초기화 + 원격 호스팅 (GitHub/GitLab/private?)
+- [x] pnpm workspace 디렉토리 구조 — apps/{extension,mobile,worker} + packages/core
+- [x] git repo 초기화 + 원격 호스팅 — GitHub private (https://github.com/bb2002/newtrospect)
 
 ## 환경 준비물 (구현 시작 전)
 
-- [ ] git init
-- [ ] Cloudflare 계정 + Workers/D1 활성화
-- [ ] Workers AI 베타 액세스 확인
-- [ ] (선택) Google Gemini API 키 준비 (S2 결과 보고)
-- [ ] Expo 계정 (Expo Go 앱 설치된 안드로이드 폰)
-- [ ] pnpm 설치
+- [x] git init + 초기 커밋 + GitHub private push
+- [x] Cloudflare 계정 + Workers/D1 활성화
+- [x] Workers AI 베타 액세스 확인
+- [x] Google Gemini API 키 준비
+- [x] Expo Go 앱 설치된 안드로이드 폰 준비됨
+- [x] pnpm 10.33.0 설치됨
 
 ## 핵심 트레이드오프 메모
 
