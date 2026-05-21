@@ -1,13 +1,13 @@
-# newtrospect — 진행상황 (2026-05-19)
+# newtrospect — 진행상황 (2026-05-21)
 
-> 갱신: 4개 패키지(core/worker/extension/mobile) 스캐폴딩 코드 완료, 전부 typecheck 통과, GitHub bb2002/newtrospect 푸시됨. 남은 건 *코드 외* 실행: D1 생성·spike 측정·실측.
+> 갱신: D1 생성·로컬+원격 마이그레이션 적용·S2 spike 5개 모델 비교 완료. `llama-3.1-8b-instruct` 채택. workers-ai.ts에 다중 schema 핸들러 추가. 남은 *코드 외* 실행: S1 Expo Go spike + 셀렉터 실측.
 
 
 > 다른 세션에서 이 프로젝트를 이어갈 때 이 문서부터 읽으세요.
 
 ## 한 줄 상태
 
-설계 완료(APPROVED), 코드 0줄, **다음 액션은 spike 3가지**.
+설계 완료(APPROVED), 스캐폴딩 + D1 + S2 spike 완료, **다음은 셀렉터 실측 + S1 spike**.
 
 ## 어디까지 왔나
 
@@ -16,7 +16,12 @@
 3. ✅ 3가지 접근(A 미니멈 / B 풀 비전 / C 일지) 비교 후 **B 채택**
 4. ✅ 디자인 문서 v2 보강 (적대적 리뷰 9개 이슈 → 7개 수정 + 2개 의식적 보류)
 5. ✅ Status: APPROVED
-6. ⬜ 구현 — *spike 후 시작*
+6. ✅ 4개 패키지 스캐폴딩 (core/worker/extension/mobile), typecheck 통과, GitHub bb2002/newtrospect push
+7. ✅ D1 생성(`1e3ae7d6-…`) + 로컬+원격 마이그레이션 적용
+8. ✅ **S2 spike 완료** — 5개 모델 비교, `@cf/meta/llama-3.1-8b-instruct` 채택. 결과는 디자인 문서 "Spike Results" + `apps/worker/spike-s2-results-*.json`
+9. ⬜ S1 Expo Go spike (사용자 직접 폰 실행 필요)
+10. ⬜ 셀렉터 실측 (사용자 직접 DevTools 확인 필요)
+11. ⬜ 익스텐션·모바일 본 구현 — S1 spike 통과 후 시작
 
 ## 디자인 문서 위치
 
@@ -26,39 +31,15 @@
 
 다음 세션 시작 시 이 문서를 *반드시* 먼저 읽으세요. 모든 의사결정의 근거가 여기 있습니다.
 
-## 다음 액션 — 코드 외 실행 (우선순위 순)
+## 다음 액션 — 우선순위 순
 
-### 0. Cloudflare D1 생성 + wrangler 로그인 (10분, 사용자 직접)
-
-```
-cd apps/worker
-npx wrangler login              # 인터랙티브 — 사용자 ! 명령
-npx wrangler d1 create newtrospect
-# 출력된 database_id 를 wrangler.toml 의 TBD 자리에 붙여넣기
-pnpm db:migrate:local           # 로컬 D1 마이그레이션 적용
-pnpm dev                        # 로컬 워커 띄우기 (포트 8787)
-```
-
-### 1. S2/S3 spike 실행 (1시간)
-
-워커가 떠 있는 상태에서 다른 터미널:
-
-```
-cd apps/worker
-pnpm spike:s2
-# spike-s2-results.json 생성됨
-```
-
-wrangler.toml 의 MODEL_* 를 후보 모델로 갈아가며 3회 반복. 결과를
-디자인 문서 (`~/.gstack/projects/newtrospect/ballbot-main-design-20260519-185536.md`)
-의 "Spike Results" 섹션에 옮긴다.
-
-### 2. 과제 1 — 셀렉터 실측 (30분, 사용자 직접)
+### 1. 셀렉터 실측 (30분, 사용자 직접)
 
 매일 보는 한국 뉴스 사이트 5곳 DevTools 로 본문 셀렉터 확인 →
-`packages/core/src/selectors.ts` 의 SITE_SELECTORS 객체를 실측값으로 교체.
+사이트 hostname + 본문 컨테이너 셀렉터를 알려주면 내가
+`packages/core/src/selectors.ts` 의 `SITE_SELECTORS` 객체에 반영.
 
-### 3. S1 spike — Expo Go (30~40분, 사용자 직접)
+### 2. S1 spike — Expo Go (30~40분, 사용자 직접)
 
 ```
 pnpm -F @newtrospect/mobile start
@@ -69,7 +50,25 @@ pnpm -F @newtrospect/mobile start
 #   [nav] / [pushState]   SPA 전환 감지?
 ```
 
-결과를 디자인 문서 "Spike Results" 에 기록.
+결과를 디자인 문서 "Spike Results" 의 S1 섹션에 기록.
+
+### 3. e2e latency 실측 (S1 통과 후, 익스텐션·모바일 연결 시)
+S2 단일 호출 latency는 p95 3초로 측정됨 (llama-3.1-8b). 4개 분석 병렬 호출의 e2e p95는 익스텐션 본 구현 후 실측. SLA(3초) 못 지키면 progressive rendering 도입.
+
+## S2 spike 정리 (완료)
+
+- 채택: `@cf/meta/llama-3.1-8b-instruct` (4개 분석 모두)
+- 비교 모델 4개 결과 + 채택 근거는 디자인 문서 "Spike Results" 섹션 참고.
+- 보조 파일: `apps/worker/spike-s2-results-{llama-3.1-8b,llama-3.3-70b,llama-3.2-3b,deepseek-r1-32b,gpt-oss-120b}.json`
+- `apps/worker/src/providers/workers-ai.ts` 에 `extractText()` 추가 — 모델별 응답 schema 차이 흡수.
+- D1 캐시 비우기 명령: `cd apps/worker && npx wrangler d1 execute newtrospect --local --command="DELETE FROM analysis_cache"` (모델 갈아끼우며 비교할 때 필요).
+
+## 워커 띄우기 (필요 시)
+
+```
+cd apps/worker && pnpm dev        # 포트 8787, Workers AI는 원격 호출
+```
+헬스 체크: `curl http://localhost:8787/health` → `{"ok":true}`
 
 ---
 
@@ -101,10 +100,11 @@ pnpm -F @newtrospect/mobile start
 
 ## 미해결 결정 (다음 세션에서 같이 정할 것들)
 
-- [ ] Workers AI 모델 최종 선택 (S2 결과 후)
-- [ ] Gemini 스왑 임계 조건 — 어떤 endpoint를 언제 갈아낄지 (S2 결과 후)
+- [x] Workers AI 모델 최종 선택 — **llama-3.1-8b-instruct 단일 모델** (S2 spike 2026-05-21)
+- [x] Gemini 스왑 임계 조건 — Workers AI 품질 충분, Gemini provider 추가 보류
 - [x] pnpm workspace 디렉토리 구조 — apps/{extension,mobile,worker} + packages/core
 - [x] git repo 초기화 + 원격 호스팅 — GitHub private (https://github.com/bb2002/newtrospect)
+- [ ] context 분석 정답 정의 — 현재 fixture에 expectedContext 비어 측정 불가. 본 구현 전 보강 필요.
 
 ## 환경 준비물 (구현 시작 전)
 

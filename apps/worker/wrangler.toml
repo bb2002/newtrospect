@@ -13,7 +13,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "newtrospect"
-database_id = "TBD-after-wrangler-d1-create"
+database_id = "1e3ae7d6-9683-4664-a226-ff183f0264a1"
 migrations_dir = "migrations"
 
 # endpoint 별 provider 매핑. S2 spike 후 갱신.
@@ -23,10 +23,11 @@ PROVIDER_SENSATIONAL = "workers-ai"
 PROVIDER_QUANTITATIVE = "workers-ai"
 PROVIDER_CONTEXT = "workers-ai"
 
-# 모델 선택. S2 spike 후 결정. 후보:
-#   @cf/meta/llama-3.1-8b-instruct
-#   @cf/qwen/qwen1.5-14b-chat-awq
-#   @cf/google/gemma-2-9b-it
+# 모델 선택 — S2 spike(2026-05-21) 결과 llama-3.1-8b 채택.
+# 4개 분석 모두 term 98% / sensational 93% / quantitative 80% / p95 3s.
+# 비교 대상(전부 탈락): llama-3.3-70b-fp8-fast(term 40%), gpt-oss-120b(p95 19s),
+# deepseek-r1-distill-qwen-32b(p95 27s), llama-3.2-3b(term 16%).
+# qwen1.5-14b-chat-awq, gemma-2-9b-it 는 Cloudflare 측 deprecation/미호스팅 으로 호출 불가.
 MODEL_TERM = "@cf/meta/llama-3.1-8b-instruct"
 MODEL_SENSATIONAL = "@cf/meta/llama-3.1-8b-instruct"
 MODEL_QUANTITATIVE = "@cf/meta/llama-3.1-8b-instruct"

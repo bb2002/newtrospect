@@ -16,14 +16,42 @@ export const workersAIProvider: AIProvider = {
       ],
       max_tokens: 1024,
       temperature: 0.1,
-    }) as { response?: string };
+    }) as unknown;
 
-    const raw = response.response ?? "";
+    const raw = extractText(response);
     const items = parseItemsLoose(raw);
     const spans = matchSpans(args.text, items, args.kind);
     return { spans, model: args.model, elapsedMs: Date.now() - t0 };
   },
 };
+
+/**
+ * Workers AI 모델별 응답 schema 가 일관되지 않다. 후보:
+ *   { response: "..." }                                 — llama-3.1-8b 등
+ *   { response: { response: "..." } }                   — 일부 모델 wrap
+ *   { result: { response: "..." } } / OpenAI-compat 변형
+ * 첫 string 을 찾아 반환.
+ */
+function extractText(r: unknown): string {
+  if (typeof r === "string") return r;
+  if (r === null || typeof r !== "object") return "";
+  const obj = r as Record<string, unknown>;
+  if (typeof obj.response === "string") return obj.response;
+  if (Array.isArray(obj.choices) && obj.choices.length > 0) {
+    const c0 = obj.choices[0] as { message?: { content?: unknown }; text?: unknown };
+    if (typeof c0?.text === "string") return c0.text;
+    if (typeof c0?.message?.content === "string") return c0.message.content;
+  }
+  if (typeof obj.response === "object" && obj.response !== null) {
+    const inner = obj.response as { response?: unknown };
+    if (typeof inner.response === "string") return inner.response;
+    return JSON.stringify(obj.response);
+  }
+  if (typeof obj.result === "object" && obj.result !== null) {
+    return extractText(obj.result);
+  }
+  return "";
+}
 
 /**
  * LLM 출력 파서. 모델이 JSON 만 출력하라고 시켜도 종종 마크다운 펜스 ```json 을 두르거나

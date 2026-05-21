@@ -19,10 +19,15 @@ import type { AnalysisKind, AnalyzeResponse } from "@newtrospect/core/server";
 
 const BASE_URL = process.env.WORKER_URL ?? "http://127.0.0.1:8787";
 
+// 2026-05-21 S2 spike 에서 실제 실행한 후보들. qwen1.5-14b 와 gemma-2-9b 는
+// Cloudflare 측 deprecation/미호스팅 으로 제외. 채택은 llama-3.1-8b.
+// 결과는 spike-s2-results-<model>.json 5개 파일로 보존됨.
 const CANDIDATE_MODELS = [
   "@cf/meta/llama-3.1-8b-instruct",
-  "@cf/qwen/qwen1.5-14b-chat-awq",
-  "@cf/google/gemma-2-9b-it",
+  "@cf/meta/llama-3.2-3b-instruct",
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+  "@cf/openai/gpt-oss-120b",
 ] as const;
 
 const KINDS: readonly AnalysisKind[] = ["term", "sensational", "quantitative", "context"];
