@@ -4,6 +4,8 @@ import { loadSettings } from "../settings.ts";
 import { applyHighlights } from "./highlight.ts";
 import { injectStyles } from "./styles.ts";
 import { updateBadge, hideBadge } from "./badge.ts";
+import { bindPopovers, hidePopover } from "./popover.ts";
+import { backgroundFetch } from "./bg-fetch.ts";
 
 /**
  * 콘텐츠 스크립트 진입.
@@ -17,26 +19,40 @@ import { updateBadge, hideBadge } from "./badge.ts";
  *   6. 페이지 전환(SPA pushState) 시 in-flight 요청 abort + 짧은 debounce 후 재실행
  */
 
+// 디버깅: content script 가 실제로 페이지에 주입됐는지 확인용. 안 보이면 익스텐션
+// 자체 unload+reload 필요. 정상 동작 확인 후 제거 가능.
+console.log("[newtrospect] content script loaded", location.href);
+
 let inflight: AbortController | null = null;
 let lastUrl = location.href;
 let runDebounce: ReturnType<typeof setTimeout> | null = null;
 
 async function run(introspectMode = false): Promise<void> {
+  console.log("[newtrospect] run() called", { introspectMode, url: location.href });
   inflight?.abort();
   inflight = new AbortController();
   const ac = inflight;
 
   const settings = await loadSettings();
-  if (!introspectMode && !settings.autoDetect) return;
+  console.log("[newtrospect] settings", settings);
+  if (!introspectMode && !settings.autoDetect) {
+    console.log("[newtrospect] autoDetect off — skipping (use toolbar)");
+    return;
+  }
 
-  const { text } = extractArticleText(document, location.href);
+  const { text, host, selectorUsed } = extractArticleText(document, location.href);
+  console.log("[newtrospect] extracted", { host, selectorUsed, textLen: text.length });
   if (text.length < MIN_BODY_LENGTH) {
+    console.log("[newtrospect] text too short, skipping");
     if (introspectMode) updateBadge({ phase: "skip", done: 0, total: 0 });
     return;
   }
 
   injectStyles();
-  const client = new NewtrospectClient({ baseUrl: settings.apiBaseUrl, signal: ac.signal });
+  // PNA(Private Network Access) 우회: content script 가 직접 fetch 하면
+  // https 페이지 → 127.0.0.1 요청이 Chrome 에 의해 차단됨.
+  // background service worker 가 대신 fetch 하도록 어댑터 주입.
+  const client = new NewtrospectClient({ baseUrl: settings.apiBaseUrl, signal: ac.signal, fetch: backgroundFetch });
 
   const enabledKinds = (Object.keys(settings.enabled) as AnalysisKind[]).filter((k) => settings.enabled[k]);
   if (enabledKinds.length === 0) {
@@ -44,20 +60,27 @@ async function run(introspectMode = false): Promise<void> {
     return;
   }
 
-  updateBadge({ phase: "running", done: 0, total: enabledKinds.length });
+  // detect 가 끝나기 전엔 뱃지를 띄우지 않는다 — 뉴스 아닌 페이지에선
+  // 사용자가 익스텐션의 존재를 인지할 필요 없음. 수동 트리거(toolbar) 일 때만
+  // "판정 중..." 을 띄워 사용자가 동작 중임을 알 수 있게 한다.
+  if (introspectMode) updateBadge({ phase: "running", done: 0, total: enabledKinds.length, message: "기사 판정 중..." });
 
   const detect = await client.detectArticle(text, location.href).catch(() => null);
   if (ac.signal.aborted) return;
   if (!detect?.isArticle) {
-    updateBadge({ phase: "skip", done: 0, total: enabledKinds.length });
+    // 자동 모드: 조용히 종료. 수동 모드: "기사 아님" 표시 후 3초 페이드.
+    if (introspectMode) updateBadge({ phase: "skip", done: 0, total: enabledKinds.length });
     return;
   }
 
   const root = currentArticleRoot();
   if (!root) {
-    updateBadge({ phase: "error", done: 0, total: enabledKinds.length, message: "본문 요소 찾을 수 없음" });
+    if (introspectMode) updateBadge({ phase: "error", done: 0, total: enabledKinds.length, message: "본문 요소 찾을 수 없음" });
     return;
   }
+  bindPopovers(root);
+  // 이 시점부터는 둘 다(자동/수동) 진행 상태를 보여준다 — 분석은 몇 초 걸림.
+  updateBadge({ phase: "running", done: 0, total: enabledKinds.length });
 
   let done = 0;
   let errors = 0;
@@ -119,6 +142,7 @@ function onUrlChange(): void {
   lastUrl = location.href;
   inflight?.abort();
   hideBadge();
+  hidePopover();
   // SPA가 DOM 을 갱신할 시간을 짧게 준다 — 너무 빨리 추출하면 이전 본문이 잡힘.
   if (runDebounce) clearTimeout(runDebounce);
   runDebounce = setTimeout(() => {

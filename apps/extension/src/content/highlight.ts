@@ -5,21 +5,24 @@ import type { AnalysisKind, Span } from "@newtrospect/core/server";
  *
  * 좌표계: span.start/end 는 root.textContent 의 *코드포인트* 오프셋.
  * root.textContent 와 본문 텍스트 추출에 사용된 텍스트가 동일해야 좌표가 맞는다.
- * (= 추출 시 normalize 를 trim 정도로만 했고, 그 trim 된 시작점부터의 인덱스다.)
  *
  * 알고리즘: TreeWalker 로 Text 노드를 순회하면서 누적 코드포인트 오프셋을 추적,
  * span 경계에 도달하면 Range 로 wrap.
  *
- * 겹침 처리: 우선순위 (빨강 > 초록 > 파랑 > 노랑) 가장 높은 색이 *배경*,
- * 나머지는 *밑줄/테두리*. 본 cut 에선 단순화 — 가장 높은 우선순위 1색만 wrap,
- * 툴팁에 모든 분석 결과 누적.
+ * 두-패스 레이어링:
+ *   1. context (노란색) 먼저 wrap — 문장 단위 배경.
+ *   2. 그 위에 sensational/quantitative/term inline wrap.
+ *   이렇게 해야 노란 형광펜 위에 다른 강조가 *덮이지 않고 공존* 한다.
+ *   ※ context wrap 이후엔 text node 가 split 되니, 2 패스에서 pieces 를 재수집.
+ *
+ * 데이터 보존: 각 nts-mark 에 data-payload(JSON 직렬화된 Span[]) 를 부착해
+ *   popover 가 클릭 시 그 자리에서 종류별 표시를 만들 수 있게 한다.
  */
 
-const PRIORITY: Record<AnalysisKind, number> = {
+const INLINE_PRIORITY: Record<Exclude<AnalysisKind, "context">, number> = {
   sensational: 0,
   quantitative: 1,
   term: 2,
-  context: 3,
 };
 
 export const HIGHLIGHT_CLASS: Record<AnalysisKind, string> = {
@@ -36,8 +39,7 @@ interface MergedMark {
   all: Span[];
 }
 
-/** 동일 텍스트 영역에 겹치는 span 을 묶고, 시각적으로 적용할 1개 색을 정한다. */
-function mergeOverlaps(spans: Span[]): MergedMark[] {
+function mergeInlineOverlaps(spans: Span[]): MergedMark[] {
   if (spans.length === 0) return [];
   const sorted = [...spans].sort((a, b) => a.start - b.start || a.end - b.end);
   const out: MergedMark[] = [];
@@ -47,7 +49,11 @@ function mergeOverlaps(spans: Span[]): MergedMark[] {
     if (last && s.start < last.end) {
       last.end = Math.max(last.end, s.end);
       last.all.push(s);
-      if (PRIORITY[s.kind] < PRIORITY[last.primary]) last.primary = s.kind;
+      if (s.kind !== "context" && last.primary !== "context") {
+        const sp = INLINE_PRIORITY[s.kind as Exclude<AnalysisKind, "context">];
+        const lp = INLINE_PRIORITY[last.primary as Exclude<AnalysisKind, "context">];
+        if (sp < lp) last.primary = s.kind;
+      }
     } else {
       out.push({ start: s.start, end: s.end, primary: s.kind, all: [s] });
     }
@@ -61,12 +67,12 @@ interface TextPiece {
   end: number;
 }
 
-/** root 안의 Text 노드들을 누적 코드포인트 오프셋과 함께 수집. */
 function collectTextPieces(root: Element): { pieces: TextPiece[]; total: number } {
   const pieces: TextPiece[] = [];
   let offset = 0;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.nodeValue && n.nodeValue.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+    acceptNode: (n) =>
+      n.nodeValue && n.nodeValue.length > 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT,
   });
   let node: Node | null = walker.nextNode();
   while (node) {
@@ -79,7 +85,6 @@ function collectTextPieces(root: Element): { pieces: TextPiece[]; total: number 
   return { pieces, total: offset };
 }
 
-/** 한 piece 안의 [pieceStart..pieceEnd) 코드포인트 구간을 UTF-16 offset 으로 변환. */
 function cpRangeToUtf16(text: string, cpStart: number, cpEnd: number): { start: number; end: number } {
   let utf16Start = 0;
   let utf16End = 0;
@@ -100,18 +105,25 @@ function cpRangeToUtf16(text: string, cpStart: number, cpEnd: number): { start: 
 }
 
 export function applyHighlights(root: Element, spans: Span[]): void {
-  const merged = mergeOverlaps(spans);
-  if (merged.length === 0) return;
-  const { pieces } = collectTextPieces(root);
+  const contextSpans = spans.filter((s): s is Extract<Span, { kind: "context" }> => s.kind === "context");
+  const inlineSpans = spans.filter((s) => s.kind !== "context");
 
-  // 끝에서부터 적용 — 앞쪽 마킹이 뒷 좌표를 흔들지 않도록.
-  for (const mark of merged.slice().reverse()) {
-    applyMark(pieces, mark);
+  // Pass 1: context 노란 배경 먼저 (서로 겹치면 합치되, 색은 노랑 유지)
+  if (contextSpans.length > 0) {
+    const merged = mergeInlineOverlaps(contextSpans);
+    const { pieces } = collectTextPieces(root);
+    for (const mark of merged.slice().reverse()) applyMark(pieces, mark);
+  }
+
+  // Pass 2: 다른 색 inline 강조. context wrap 이후라 pieces 재수집.
+  if (inlineSpans.length > 0) {
+    const merged = mergeInlineOverlaps(inlineSpans);
+    const { pieces } = collectTextPieces(root);
+    for (const mark of merged.slice().reverse()) applyMark(pieces, mark);
   }
 }
 
 function applyMark(pieces: TextPiece[], mark: MergedMark): void {
-  // mark 구간이 어떤 piece(들) 에 걸치는지 찾기
   const overlapping = pieces.filter((p) => p.start < mark.end && p.end > mark.start);
   if (overlapping.length === 0) return;
 
@@ -133,25 +145,12 @@ function applyMark(pieces: TextPiece[], mark: MergedMark): void {
     }
     const wrap = document.createElement("nts-mark");
     wrap.className = HIGHLIGHT_CLASS[mark.primary];
-    wrap.dataset.kinds = mark.all.map((s) => s.kind).join(",");
-    wrap.title = buildTooltip(mark);
+    wrap.dataset.kinds = Array.from(new Set(mark.all.map((s) => s.kind))).join(",");
+    wrap.dataset.payload = JSON.stringify(mark.all);
     try {
       range.surroundContents(wrap);
     } catch {
       // partial coverage (Range crosses element boundary) — 본 cut 에선 스킵
     }
   }
-}
-
-function buildTooltip(mark: MergedMark): string {
-  return mark.all
-    .map((s) => {
-      switch (s.kind) {
-        case "term": return `용어: ${s.payload.explanation}`;
-        case "sensational": return `자극: ${s.payload.reason}`;
-        case "quantitative": return `수치 — 검색: ${s.payload.searchQuery}`;
-        case "context": return "핵심 문맥";
-      }
-    })
-    .join("\n");
 }
