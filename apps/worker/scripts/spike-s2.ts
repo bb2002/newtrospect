@@ -133,7 +133,7 @@ function expectedFor(fixture: (typeof FIXTURES)[number], kind: AnalysisKind): re
     case "term": return fixture.expectedTerms;
     case "sensational": return fixture.expectedSensational;
     case "quantitative": return fixture.expectedQuantitative;
-    case "context": return []; // context 는 정답 정의가 모호 → recall 측정 제외
+    case "context": return fixture.expectedContext;
   }
 }
 

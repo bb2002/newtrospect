@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json",
     "db:migrate:local": "wrangler d1 migrations apply newtrospect --local",
     "db:migrate:remote": "wrangler d1 migrations apply newtrospect --remote",
-    "spike:s2": "tsx scripts/spike-s2.ts"
+    "spike:s2": "tsx scripts/spike-s2.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@newtrospect/core": "workspace:*",
@@ -22,6 +24,7 @@
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
     "wrangler": "^3.91.0"
   }
 }

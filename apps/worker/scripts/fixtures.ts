@@ -14,6 +14,8 @@ export interface Fixture {
   expectedQuantitative: readonly string[];
   /** 기대 어려운 용어. */
   expectedTerms: readonly string[];
+  /** 기대 핵심 문맥 문장 (요약자 시점에서 노란 형광펜 칠 만한 문장). */
+  expectedContext: readonly string[];
 }
 
 export const FIXTURES: readonly Fixture[] = [
@@ -24,6 +26,10 @@ export const FIXTURES: readonly Fixture[] = [
     expectedSensational: ["충격적", "초유의 사태", "경악", "발칵 뒤집혔", "분노", "격분"],
     expectedQuantitative: [],
     expectedTerms: ["CCTV", "구조적 문제"],
+    expectedContext: [
+      "어제 오후 서울 강남구의 한 카페에서 초유의 사태가 발생했다",
+      "전문가들은 이번 사건이 단순 우발이 아닌 구조적 문제를 드러낸다고 지적했다",
+    ],
   },
   {
     id: "f2-numbers-heavy",
@@ -32,6 +38,10 @@ export const FIXTURES: readonly Fixture[] = [
     expectedSensational: [],
     expectedQuantitative: ["12.4% 증가한 1820조 원", "5년 만의 최대 증가폭", "41% 늘었", "1조 2천억 원", "3.50%", "60% 이상"],
     expectedTerms: ["가계부채", "전세보증금 반환 보증", "기준금리", "GDP", "OECD"],
+    expectedContext: [
+      "지난해 4분기 가계부채는 전년 동기 대비 12.4% 증가한 1820조 원을 기록했다",
+      "한국은행은 기준금리를 3.50%로 동결했으나, 시장은 추가 인하 가능성을 60% 이상으로 보고 있다",
+    ],
   },
   {
     id: "f3-political-emotional",
@@ -40,6 +50,10 @@ export const FIXTURES: readonly Fixture[] = [
     expectedSensational: ["충돌이 격화", "폭주", "강도 높은 비판", "선동", "마비", "유례없는"],
     expectedQuantitative: [],
     expectedTerms: ["국정 운영", "헌정 사상", "시민단체"],
+    expectedContext: [
+      "정치권에서는 이번 사태로 인해 국정 운영이 사실상 마비될 것이라는 우려가 커지고 있다",
+      "시민단체들은 즉각적인 대화 재개를 촉구했다",
+    ],
   },
   {
     id: "f4-tech-jargon",
@@ -48,6 +62,10 @@ export const FIXTURES: readonly Fixture[] = [
     expectedSensational: [],
     expectedQuantitative: ["40% 낮아", "200K 토큰", "89.2점"],
     expectedTerms: ["멀티모달", "LLM", "추론 비용", "컨텍스트 윈도우", "RAG", "RAGAS", "sLLM", "양자화", "증류", "온디바이스", "TCO"],
+    expectedContext: [
+      "오픈AI가 새 멀티모달 LLM을 공개했다",
+      "국내 AI 스타트업들은 sLLM 분야에서 양자화·증류 기법을 통해 온디바이스 추론 성능을 끌어올리고 있다",
+    ],
   },
   {
     id: "f5-mixed",
@@ -56,5 +74,10 @@ export const FIXTURES: readonly Fixture[] = [
     expectedSensational: ["흔들리고", "공포 매물", "디폴트 위기", "폭탄이 본격화", "충격은 가늠하기 어렵다", "경고"],
     expectedQuantitative: ["3주 연속 하락", "8.7% 떨어", "30여 곳"],
     expectedTerms: ["PF 대출", "시행사", "디폴트", "역전세", "LTV", "DTI"],
+    expectedContext: [
+      "서울 아파트 매매가는 3주 연속 하락했으며, 강남 3구의 호가는 평균 8.7% 떨어졌다",
+      "PF 대출 부실 우려가 커지면서 중소 시행사 30여 곳이 디폴트 위기에 몰렸다",
+      "정부는 LTV·DTI 규제 완화를 검토 중이지만, 시장은 회의적 반응을 보이고 있다",
+    ],
   },
 ];
