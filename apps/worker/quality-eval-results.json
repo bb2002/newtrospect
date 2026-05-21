@@ -1,0 +1,436 @@
+{
+  "ts": "2026-05-21T09:24:08.447Z",
+  "results": [
+    {
+      "articleId": "a1-grandson-murder",
+      "source": "노컷뉴스",
+      "kind": "context",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1282,
+      "spanCount": 3,
+      "spans": [
+        {
+          "text": "함께 살던 80대 조부를 살해한 혐의로 구속된 20대 여성이 \"할아버지가 청소하다가 쓰러졌다\"고 거짓 진술을 하는 등 범행을 숨기려다 병원에서 긴급체포된 것으로 확인됐다.",
+          "payload": {}
+        },
+        {
+          "text": "A씨는 결국 경찰 조사에서 \"말다툼 도중 우발적으로 흉기를 휘둘렀다\"는 취지로 범행을 시인했다고 한다.",
+          "payload": {}
+        },
+        {
+          "text": "서울북부지법 형사10단독 박사랑 부장판사는 전날(20일) 존속살인 혐의를 받는 A씨에 대해 \"도망할 염려와 증거인멸 염려가 있다\"며 구속영장을 발부했다.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "articleId": "a1-grandson-murder",
+      "source": "노컷뉴스",
+      "kind": "sensational",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 728,
+      "spanCount": 0,
+      "spans": []
+    },
+    {
+      "articleId": "a1-grandson-murder",
+      "source": "노컷뉴스",
+      "kind": "term",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1082,
+      "spanCount": 4,
+      "spans": [
+        {
+          "text": "자상",
+          "payload": {
+            "explanation": "칼이나 송곳 같은 날카로운 물체에 찔려서 생긴 상처"
+          }
+        },
+        {
+          "text": "존속살인",
+          "payload": {
+            "explanation": "자기 또는 배우자의 직계존속을 살해한 죄. 일반 살인보다 가중 처벌"
+          }
+        },
+        {
+          "text": "구속영장",
+          "payload": {
+            "explanation": "피의자를 구속하기 위해 판사가 발부하는 영장"
+          }
+        },
+        {
+          "text": "송치",
+          "payload": {
+            "explanation": "경찰이 수사한 사건을 검찰로 넘기는 절차"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a1-grandson-murder",
+      "source": "노컷뉴스",
+      "kind": "quantitative",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 884,
+      "spanCount": 0,
+      "spans": []
+    },
+    {
+      "articleId": "a2-samsung-vote",
+      "source": "중앙일보",
+      "kind": "context",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1021,
+      "spanCount": 3,
+      "spans": [
+        {
+          "text": "삼성전자가 마라톤 노사협상 끝에 극적으로 도출해 낸 합의안이 노조원들의 심판대에 오른다.",
+          "payload": {}
+        },
+        {
+          "text": "이번 합의안에 대한 조합원 찬반투표는 오는 22일 오후 2시부터 27일 오전 10시까지 약 5일 동안 진행된다.",
+          "payload": {}
+        },
+        {
+          "text": "찬반투표가 가결될 경우 노조의 총파업은 공식 철회된다.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "articleId": "a2-samsung-vote",
+      "source": "중앙일보",
+      "kind": "sensational",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1843,
+      "spanCount": 3,
+      "spans": [
+        {
+          "text": "합의안이 최종 제도화될지, 아니면 더 큰 리스크의 불씨가 될지 결정되는 셈이다.",
+          "payload": {
+            "reason": "리스크의 불씨라는 부정적 비유를 사용하여 위기감을 조성함"
+          }
+        },
+        {
+          "text": "반면 조합원들의 문턱을 넘지 못할 경우, 총파업 재점화는 물론 정부의 개입과 노조와해로 이어지는 '부결 후폭풍 시나리오'가 현실화할 거란 전망도 나온다.",
+          "payload": {
+            "reason": "부결 후폭풍 시나리오라는 표현으로 부정적 결과에 대한 위기감을 조성함"
+          }
+        },
+        {
+          "text": "무엇보다 합의안이 조합원 문턱을 넘지 못할 경우 삼성전자 노조의 존립 자체를 뒤흔드는 부메랑이 될 것이라는 관측이 우세하다.",
+          "payload": {
+            "reason": "존립을 뒤흔드는 부메랑이라는 표현으로 파멸적 위기감을 조성함"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a2-samsung-vote",
+      "source": "중앙일보",
+      "kind": "term",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1569,
+      "spanCount": 5,
+      "spans": [
+        {
+          "text": "단체협약",
+          "payload": {
+            "explanation": "노동조합과 사용자 간에 임금, 근로시간 등 근로조건에 관해 체결한 서면 합의"
+          }
+        },
+        {
+          "text": "긴급조정권",
+          "payload": {
+            "explanation": "국민경제나 일상생활을 위태롭게 할 우려가 있는 파업에 대해 정부가 강제로 30일간 중단시키는 권한"
+          }
+        },
+        {
+          "text": "행정처분 취소소송",
+          "payload": {
+            "explanation": "행정청의 위법한 처분으로 권리를 침해받았을 때 그 처분을 취소해달라고 법원에 제기하는 소송"
+          }
+        },
+        {
+          "text": "가처분",
+          "payload": {
+            "explanation": "본안 판결 전까지 권리 관계를 잠정적으로 확정하거나 현상을 유지하기 위해 법원이 내리는 임시 처분"
+          }
+        },
+        {
+          "text": "쟁의권",
+          "payload": {
+            "explanation": "노동자가 근로조건 향상을 위해 파업, 태업 등 단체 행동을 할 수 있는 권리"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a2-samsung-vote",
+      "source": "중앙일보",
+      "kind": "quantitative",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1359,
+      "spanCount": 7,
+      "spans": [
+        {
+          "text": "6개월",
+          "payload": {
+            "searchQuery": "삼성전자 노사 갈등 6개월"
+          }
+        },
+        {
+          "text": "3일 10시간",
+          "payload": {
+            "searchQuery": "2005년 대한항공 조종사 노조 파업 긴급조정권 발동 시간"
+          }
+        },
+        {
+          "text": "30일간",
+          "payload": {
+            "searchQuery": "긴급조정권 발동 시 파업 금지 기간"
+          }
+        },
+        {
+          "text": "하루 최대 1조원 규모의 손실",
+          "payload": {
+            "searchQuery": "삼성전자 반도체 생산 차질 하루 1조원 손실"
+          }
+        },
+        {
+          "text": "4701명",
+          "payload": {
+            "searchQuery": "2025년 9월 삼성전자 노조 조합원 수"
+          }
+        },
+        {
+          "text": "7만7000명",
+          "payload": {
+            "searchQuery": "삼성전자 노조 조합원 수 7만7000명"
+          }
+        },
+        {
+          "text": "7만985명",
+          "payload": {
+            "searchQuery": "삼성전자 노조 조합원 수 7만985명"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a3-tank-day",
+      "source": "헤럴드경제",
+      "kind": "context",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1362,
+      "spanCount": 3,
+      "spans": [
+        {
+          "text": "서울경찰청이 스타벅스코리아의 '탱크 데이' 프로모션 관련 고발 사건을 직접 수사한다.",
+          "payload": {}
+        },
+        {
+          "text": "서울청은 스타벅스 프로모션과 관련해 정용진 신세계그룹 회장과 손정현 전 스타벅스코리아 대표가 고발당한 사건을 서울청 광역수사단 공공범죄수사대에 재배당했다.",
+          "payload": {}
+        },
+        {
+          "text": "시민단체인 서민민생대책위원회(서민위)는 앞서 스타벅스코리아의 프로모션과 관련해 정 회장과 손 전 대표를 모욕과 명예훼손 혐의로 고발했다.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "articleId": "a3-tank-day",
+      "source": "헤럴드경제",
+      "kind": "sensational",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 874,
+      "spanCount": 0,
+      "spans": []
+    },
+    {
+      "articleId": "a3-tank-day",
+      "source": "헤럴드경제",
+      "kind": "term",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1095,
+      "spanCount": 2,
+      "spans": [
+        {
+          "text": "병합 수사",
+          "payload": {
+            "explanation": "관련된 여러 개의 사건을 하나로 합쳐서 함께 수사하는 것"
+          }
+        },
+        {
+          "text": "고발인",
+          "payload": {
+            "explanation": "범죄 사실을 수사기관에 알려 처벌을 요구하는 사람"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a3-tank-day",
+      "source": "헤럴드경제",
+      "kind": "quantitative",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 777,
+      "spanCount": 1,
+      "spans": [
+        {
+          "text": "46주년",
+          "payload": {
+            "searchQuery": "스타벅스 탱크 텀블러 5·18민주화운동 46주년 논란"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a4-property-tax",
+      "source": "전한길뉴스",
+      "kind": "context",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1464,
+      "spanCount": 4,
+      "spans": [
+        {
+          "text": "국토교통부는 29일 2026년 1월 1일 기준 전국 공동주택 약 1,585만 가구의 공시가격을 30일부터 공시한다고 밝혔다.",
+          "payload": {}
+        },
+        {
+          "text": "올해 전국 평균 공시가격 변동률은 9.13%로, 지난 3월 공개된 공시가격(안) 9.16%보다 0.03%포인트 낮아졌으며, 현실화율은 전년과 동일한 69%를 유지한 채 시세 변동분만 반영됐다.",
+          "payload": {}
+        },
+        {
+          "text": "지역별로는 서울이 18.60% 상승하며 전국에서 가장 높은 상승률을 기록했고, 경기 6.37%, 세종 6.28%, 울산 5.22%, 전북 4.32% 등이 뒤를 이었다.",
+          "payload": {}
+        },
+        {
+          "text": "1세대 1주택자 기준 공시가격 12억원 초과 주택은 지난해 31만7998가구에서 올해 48만6719가구로 증가해 1년 새 약 16만9000가구가 새롭게 과세 대상에 편입됐다.",
+          "payload": {}
+        }
+      ]
+    },
+    {
+      "articleId": "a4-property-tax",
+      "source": "전한길뉴스",
+      "kind": "sensational",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 993,
+      "spanCount": 1,
+      "spans": [
+        {
+          "text": "공시가격은 재산세와 종합부동산세뿐 아니라 건강보험료, 기초연금 등 각종 행정 기준으로 활용되는 만큼, 이번 상승은 국민 부담 증가로 이어질 가능성이 크다는 분석이 나온다.",
+          "payload": {
+            "reason": "부정적 결과(국민 부담 증가)를 가능성이 높다는 표현과 함께 제시하여 위기감을 조성함"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a4-property-tax",
+      "source": "전한길뉴스",
+      "kind": "term",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1109,
+      "spanCount": 3,
+      "spans": [
+        {
+          "text": "현실화율",
+          "payload": {
+            "explanation": "공시가격이 실제 시세와 얼마나 근접한지를 나타내는 비율"
+          }
+        },
+        {
+          "text": "보유세",
+          "payload": {
+            "explanation": "부동산을 소유하고 있는 것만으로도 부과되는 재산세와 종합부동산세를 통칭하는 말"
+          }
+        },
+        {
+          "text": "종합부동산세",
+          "payload": {
+            "explanation": "일정 기준 이상의 고가 부동산 보유자에게 부과하는 국세"
+          }
+        }
+      ]
+    },
+    {
+      "articleId": "a4-property-tax",
+      "source": "전한길뉴스",
+      "kind": "quantitative",
+      "model": "gemini-3.1-flash-lite-preview",
+      "elapsedMs": 1844,
+      "spanCount": 11,
+      "spans": [
+        {
+          "text": "약 1,585만 가구",
+          "payload": {
+            "searchQuery": "2026년 전국 공동주택 공시가격 대상 가구수"
+          }
+        },
+        {
+          "text": "9.13%",
+          "payload": {
+            "searchQuery": "2026년 전국 공동주택 평균 공시가격 변동률"
+          }
+        },
+        {
+          "text": "69%",
+          "payload": {
+            "searchQuery": "2026년 공동주택 공시가격 현실화율"
+          }
+        },
+        {
+          "text": "34억3600만원",
+          "payload": {
+            "searchQuery": "래미안 원베일리 전용 84㎡ 작년 공시가격"
+          }
+        },
+        {
+          "text": "45억6900만원",
+          "payload": {
+            "searchQuery": "래미안 원베일리 전용 84㎡ 올해 공시가격"
+          }
+        },
+        {
+          "text": "33.0%",
+          "payload": {
+            "searchQuery": "래미안 원베일리 전용 84㎡ 공시가격 상승률"
+          }
+        },
+        {
+          "text": "57.1%",
+          "payload": {
+            "searchQuery": "래미안 원베일리 전용 84㎡ 보유세 증가율"
+          }
+        },
+        {
+          "text": "12억원 초과",
+          "payload": {
+            "searchQuery": "1세대 1주택자 종합부동산세 과세 기준"
+          }
+        },
+        {
+          "text": "48만6719가구",
+          "payload": {
+            "searchQuery": "2026년 공시가격 12억원 초과 주택 수"
+          }
+        },
+        {
+          "text": "1만4561건",
+          "payload": {
+            "searchQuery": "2026년 공동주택 공시가격 의견 제출 건수"
+          }
+        },
+        {
+          "text": "252% 증가",
+          "payload": {
+            "searchQuery": "2026년 공시가격 의견 제출 건수 전년 대비 증가율"
+          }
+        }
+      ]
+    }
+  ]
+}

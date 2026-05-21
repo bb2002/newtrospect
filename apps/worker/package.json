@@ -12,6 +12,7 @@
     "db:migrate:local": "wrangler d1 migrations apply newtrospect --local",
     "db:migrate:remote": "wrangler d1 migrations apply newtrospect --remote",
     "spike:s2": "tsx scripts/spike-s2.ts",
+    "quality:eval": "wrangler d1 execute newtrospect --local --command=\"DELETE FROM analysis_cache\" >/dev/null 2>&1 && tsx scripts/quality-eval.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

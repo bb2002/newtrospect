@@ -17,6 +17,9 @@ export interface Env {
   MODEL_DETECT: string;
 
   CACHE_TTL_SEC: string;
+
+  /** Gemini provider 사용 시 필요 — wrangler secret put GEMINI_API_KEY */
+  GEMINI_API_KEY?: string;
 }
 
 const PROVIDER_KEY = {

@@ -1,25 +1,46 @@
 import { Hono } from "hono";
-import { cors } from "hono/cors";
 import type { AnalysisKind, AnalyzeResponse, DetectArticleResponse } from "@newtrospect/core/server";
 import { MIN_BODY_LENGTH, sha256Hex } from "@newtrospect/core/server";
 import type { Env } from "./env.ts";
 import { cacheTtlSec, detectModel, detectProvider, modelFor, providerFor } from "./env.ts";
 import { logRequest, readCache, readDetectCache, writeCache, writeDetectCache } from "./cache.ts";
 import { workersAIProvider, extractText } from "./providers/workers-ai.ts";
+import { geminiProvider } from "./providers/gemini.ts";
 import type { AIProvider } from "./provider.ts";
 import { DETECT_PROMPT, DETECT_SAMPLE_CP } from "./prompts.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use(
-  "*",
-  cors({
-    origin: "*",
-    allowMethods: ["POST", "GET", "OPTIONS"],
-    allowHeaders: ["content-type"],
-    maxAge: 86400,
-  }),
-);
+/**
+ * CORS + Private Network Access 직접 처리.
+ *
+ * Chrome 의 PNA(Private Network Access) 기능 때문에 hono/cors 기본 응답으론
+ * 공개 사이트(https://...) → 로컬 워커(127.0.0.1:8787) 요청이 차단된다.
+ * 해결: preflight·실응답 모두에 Access-Control-Allow-Private-Network: true 를 추가.
+ * (browser 가 ACR-Private-Network: true 헤더를 자동 보내며, 서버가 ACAP-PN 으로 화답해야 함)
+ *
+ * https://developer.chrome.com/blog/private-network-access-preflight/
+ */
+app.use("*", async (c, next) => {
+  const origin = c.req.header("origin") ?? "*";
+  if (c.req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers": c.req.header("access-control-request-headers") ?? "content-type",
+        "Access-Control-Allow-Private-Network": "true",
+        "Access-Control-Max-Age": "86400",
+        Vary: "Origin",
+      },
+    });
+  }
+  await next();
+  c.header("Access-Control-Allow-Origin", origin);
+  c.header("Access-Control-Allow-Private-Network", "true");
+  c.header("Vary", "Origin");
+});
 
 app.get("/health", (c) => {
   const env = c.env;
@@ -163,7 +184,7 @@ async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promis
 
 function resolveProvider(name: string): AIProvider | null {
   if (name === "workers-ai") return workersAIProvider;
-  // gemini provider 는 Workers AI 품질이 부족하다고 판단될 때 추가.
+  if (name === "gemini") return geminiProvider;
   return null;
 }
 
