@@ -3,20 +3,23 @@ import type { AnalysisKind, Span } from "@newtrospect/core/server";
 import { loadSettings } from "../settings.ts";
 import { applyHighlights } from "./highlight.ts";
 import { injectStyles } from "./styles.ts";
+import { updateBadge, hideBadge } from "./badge.ts";
 
 /**
  * 콘텐츠 스크립트 진입.
  *
  * 흐름:
  *   1. 설정 로드 → autoDetect 면 즉시 시도, 아니면 toolbar 메시지 기다림
- *   2. 본문 추출 (selectorsForHost → <article> 폴백)
+ *   2. 본문 추출 (selectorsForHost → schema.org → <article> 폴백)
  *   3. /api/detect-article → 뉴스 아니면 종료
  *   4. enabled 한 분석들만 병렬 호출 → 도착하는 대로 하이라이트 적용
- *   5. 페이지 전환(SPA pushState) 시 in-flight 요청 abort
+ *   5. badge 로 진행 상태 사용자에게 노출 (조용한 실패 방지)
+ *   6. 페이지 전환(SPA pushState) 시 in-flight 요청 abort + 짧은 debounce 후 재실행
  */
 
 let inflight: AbortController | null = null;
 let lastUrl = location.href;
+let runDebounce: ReturnType<typeof setTimeout> | null = null;
 
 async function run(introspectMode = false): Promise<void> {
   inflight?.abort();
@@ -27,19 +30,37 @@ async function run(introspectMode = false): Promise<void> {
   if (!introspectMode && !settings.autoDetect) return;
 
   const { text } = extractArticleText(document, location.href);
-  if (text.length < MIN_BODY_LENGTH) return;
+  if (text.length < MIN_BODY_LENGTH) {
+    if (introspectMode) updateBadge({ phase: "skip", done: 0, total: 0 });
+    return;
+  }
 
   injectStyles();
   const client = new NewtrospectClient({ baseUrl: settings.apiBaseUrl, signal: ac.signal });
 
+  const enabledKinds = (Object.keys(settings.enabled) as AnalysisKind[]).filter((k) => settings.enabled[k]);
+  if (enabledKinds.length === 0) {
+    if (introspectMode) updateBadge({ phase: "skip", done: 0, total: 0, message: "표시할 분석이 없음" });
+    return;
+  }
+
+  updateBadge({ phase: "running", done: 0, total: enabledKinds.length });
+
   const detect = await client.detectArticle(text, location.href).catch(() => null);
-  if (!detect?.isArticle) return;
+  if (ac.signal.aborted) return;
+  if (!detect?.isArticle) {
+    updateBadge({ phase: "skip", done: 0, total: enabledKinds.length });
+    return;
+  }
 
   const root = currentArticleRoot();
-  if (!root) return;
+  if (!root) {
+    updateBadge({ phase: "error", done: 0, total: enabledKinds.length, message: "본문 요소 찾을 수 없음" });
+    return;
+  }
 
-  const enabledKinds = (Object.keys(settings.enabled) as AnalysisKind[]).filter((k) => settings.enabled[k]);
-
+  let done = 0;
+  let errors = 0;
   await Promise.allSettled(
     enabledKinds.map(async (kind) => {
       try {
@@ -47,10 +68,24 @@ async function run(introspectMode = false): Promise<void> {
         if (ac.signal.aborted) return;
         applyHighlights(root, res.spans as Span[]);
       } catch {
-        // 한 분석 실패는 조용히 — 다른 색은 계속 진행
+        errors++;
+      } finally {
+        done++;
+        if (!ac.signal.aborted) {
+          updateBadge({ phase: "running", done, total: enabledKinds.length });
+        }
       }
     }),
   );
+
+  if (ac.signal.aborted) return;
+  if (errors === enabledKinds.length) {
+    updateBadge({ phase: "error", done, total: enabledKinds.length, message: "서버 응답 실패 — 옵션 확인" });
+  } else if (errors > 0) {
+    updateBadge({ phase: "ok", done: done - errors, total: enabledKinds.length, message: `완료(부분 실패 ${errors})` });
+  } else {
+    updateBadge({ phase: "ok", done, total: enabledKinds.length });
+  }
 }
 
 function currentArticleRoot(): Element | null {
@@ -64,11 +99,16 @@ function currentArticleRoot(): Element | null {
   return null;
 }
 
-// SPA 페이지 전환 감지 — pushState/popstate 패치.
+// SPA 페이지 전환 감지 — pushState/replaceState/popstate 패치.
 function watchNavigation(): void {
-  const orig = history.pushState;
+  const origPush = history.pushState;
   history.pushState = function (...args) {
-    orig.apply(this, args);
+    origPush.apply(this, args);
+    onUrlChange();
+  };
+  const origReplace = history.replaceState;
+  history.replaceState = function (...args) {
+    origReplace.apply(this, args);
     onUrlChange();
   };
   window.addEventListener("popstate", onUrlChange);
@@ -78,8 +118,12 @@ function onUrlChange(): void {
   if (location.href === lastUrl) return;
   lastUrl = location.href;
   inflight?.abort();
-  // 새 페이지에서 다시 시도 — autoDetect 가 켜져 있어야만
-  run().catch(() => {});
+  hideBadge();
+  // SPA가 DOM 을 갱신할 시간을 짧게 준다 — 너무 빨리 추출하면 이전 본문이 잡힘.
+  if (runDebounce) clearTimeout(runDebounce);
+  runDebounce = setTimeout(() => {
+    run().catch(() => {});
+  }, 250);
 }
 
 // 툴바 아이콘 클릭으로 강제 트리거

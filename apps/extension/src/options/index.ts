@@ -22,11 +22,22 @@ async function init(): Promise<void> {
     for (const el of kindInputs) {
       enabled[el.dataset.kind as AnalysisKind] = el.checked;
     }
-    await saveSettings({
-      apiBaseUrl: apiInput.value.trim() || DEFAULT_SETTINGS.apiBaseUrl,
-      autoDetect: autoInput.checked,
-      enabled,
-    });
+    const rawUrl = apiInput.value.trim();
+    let apiBaseUrl = DEFAULT_SETTINGS.apiBaseUrl;
+    if (rawUrl) {
+      try {
+        const u = new URL(rawUrl);
+        if (u.protocol !== "http:" && u.protocol !== "https:") {
+          throw new Error("http(s) 만 허용");
+        }
+        // trailing slash 제거 — 클라이언트가 path를 직접 붙임
+        apiBaseUrl = rawUrl.replace(/\/+$/, "");
+      } catch (err) {
+        status.textContent = `URL 형식 오류 — ${err instanceof Error ? err.message : String(err)}`;
+        return;
+      }
+    }
+    await saveSettings({ apiBaseUrl, autoDetect: autoInput.checked, enabled });
     status.textContent = "저장됨 · " + new Date().toLocaleTimeString();
   }
 

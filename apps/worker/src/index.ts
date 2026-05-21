@@ -10,9 +10,29 @@ import type { AIProvider } from "./provider.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
-app.use("*", cors({ origin: "*", allowMethods: ["POST", "GET", "OPTIONS"] }));
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowMethods: ["POST", "GET", "OPTIONS"],
+    allowHeaders: ["content-type"],
+    maxAge: 86400,
+  }),
+);
 
-app.get("/health", (c) => c.json({ ok: true }));
+app.get("/health", (c) => {
+  const env = c.env;
+  return c.json({
+    ok: true,
+    models: {
+      term: modelFor(env, "term"),
+      sensational: modelFor(env, "sensational"),
+      quantitative: modelFor(env, "quantitative"),
+      context: modelFor(env, "context"),
+    },
+    cacheTtlSec: cacheTtlSec(env),
+  });
+});
 
 /**
  * 본문 평문을 받아 (a) 뉴스 기사 여부 (b) 정제된 본문 반환.
@@ -42,7 +62,6 @@ for (const kind of KINDS) {
 }
 
 async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promise<Response> {
-  const url = new URL(req.url);
   const reqOrigin = req.headers.get("origin");
   let host: string | null = null;
   try {
@@ -51,7 +70,7 @@ async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promis
     host = null;
   }
 
-  const body = await req.json().catch(() => ({})) as { text?: string };
+  const body = (await req.json().catch(() => ({}))) as { text?: string };
   const text = (body.text ?? "").trim();
   if (text.length < MIN_BODY_LENGTH) {
     await logRequest(env, { host, kind, model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
@@ -70,7 +89,7 @@ async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promis
   const provider = resolveProvider(providerName);
   if (!provider) {
     await logRequest(env, { host, kind, model, elapsedMs: null, statusCode: 500, cacheHit: false });
-    return Response.json({ error: `unknown provider: ${providerName}` }, { status: 500 });
+    return Response.json({ error: "provider_not_found" }, { status: 500 });
   }
 
   try {
@@ -80,15 +99,18 @@ async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promis
     await logRequest(env, { host, kind, model: result.model, elapsedMs: result.elapsedMs, statusCode: 200, cacheHit: false });
     return Response.json(response);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    // raw 에러 메시지(Cloudflare 내부 에러 코드·모델 path 등) 는 클라이언트에 노출하지 않는다.
+    // 자세한 원인은 wrangler tail / D1 request_log 에서 추적.
+    const raw = err instanceof Error ? err.message : String(err);
+    console.error(`[analyze:${kind}] model=${model} host=${host ?? "?"} err=${raw}`);
     await logRequest(env, { host, kind, model, elapsedMs: null, statusCode: 500, cacheHit: false });
-    return Response.json({ error: msg }, { status: 500 });
+    return Response.json({ error: "analyze_failed", kind }, { status: 500 });
   }
 }
 
 function resolveProvider(name: string): AIProvider | null {
   if (name === "workers-ai") return workersAIProvider;
-  // gemini provider 는 S2 spike 후 추가.
+  // gemini provider 는 Workers AI 품질이 부족하다고 판단될 때 추가.
   return null;
 }
 
