@@ -30,9 +30,12 @@ export const workersAIProvider: AIProvider = {
  *   { response: "..." }                                 — llama-3.1-8b 등
  *   { response: { response: "..." } }                   — 일부 모델 wrap
  *   { result: { response: "..." } } / OpenAI-compat 변형
- * 첫 string 을 찾아 반환.
+ *   { response: { items: [...] } }                      — llama-3.3-70b 가 객체 직접 반환
+ * 첫 string 을 찾아 반환. 객체가 직접 반환된 경우 JSON.stringify.
+ *
+ * detect-article 핸들러에서도 동일한 schema 흡수가 필요해 export.
  */
-function extractText(r: unknown): string {
+export function extractText(r: unknown): string {
   if (typeof r === "string") return r;
   if (r === null || typeof r !== "object") return "";
   const obj = r as Record<string, unknown>;

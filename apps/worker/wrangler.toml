@@ -22,6 +22,7 @@ PROVIDER_TERM = "workers-ai"
 PROVIDER_SENSATIONAL = "workers-ai"
 PROVIDER_QUANTITATIVE = "workers-ai"
 PROVIDER_CONTEXT = "workers-ai"
+PROVIDER_DETECT = "workers-ai"
 
 # 모델 선택 — S2 spike(2026-05-21) 결과 llama-3.1-8b 채택.
 # 4개 분석 모두 term 98% / sensational 93% / quantitative 80% / p95 3s.
@@ -32,6 +33,8 @@ MODEL_TERM = "@cf/meta/llama-3.1-8b-instruct"
 MODEL_SENSATIONAL = "@cf/meta/llama-3.1-8b-instruct"
 MODEL_QUANTITATIVE = "@cf/meta/llama-3.1-8b-instruct"
 MODEL_CONTEXT = "@cf/meta/llama-3.1-8b-instruct"
+# detect 는 짧은 본문 슬라이스만 받으니 8b 로 충분. 추후 더 작은 모델로 교체 검토 가능.
+MODEL_DETECT = "@cf/meta/llama-3.1-8b-instruct"
 
 # 캐시 TTL (초). 1시간.
 CACHE_TTL_SEC = "3600"

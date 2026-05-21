@@ -9,7 +9,27 @@ import type { AnalysisKind } from "@newtrospect/core/server";
  * - quantitative 의 detection 카테고리를 명시해 recall 끌어올림 (8b 기준 80% → 목표 90%+)
  * - JSON 외 출력 금지를 더 단호하게
  * - one-shot 예시 추가 — 모델이 schema 를 더 정확히 따르도록
+ *
+ * detect-article 은 별도 분리 (DETECT_PROMPT) — 분석 4종과 schema 다름.
  */
+
+/**
+ * "이 텍스트가 뉴스 기사 본문인가" 판정용 prompt.
+ *
+ * 셀렉터 dictionary 가 없는 사이트에서도 폴백 추출 + AI 판정으로 자동 대응.
+ * cleanedText 는 좌표 보존 위해 *입력 그대로 normalize* — AI 가 변형하지 않는다.
+ * AI 는 boolean + 이유만 출력.
+ */
+export const DETECT_PROMPT = [
+  "당신은 입력 텍스트가 *뉴스 기사 본문* 인지 판정하는 분류기다.",
+  "기사 본문 = 사실·인용·날짜·인물·수치가 서술형으로 흐르는 텍스트.",
+  "기사 아님 = 메뉴 목록, 헤드라인 목록, 광고, 댓글, UI 안내문, 페이월 메시지, 검색 결과 페이지 등.",
+  '출력 형식: {"isArticle": true|false, "reason": "<50자 이내 이유>"}',
+  "JSON 외의 글자(설명, 마크다운, 코드펜스)는 절대 출력하지 말 것.",
+].join("\n");
+
+/** AI 판정에 보낼 본문 슬라이스 길이 (코드포인트). 앞부분만 봐도 기사 판별 가능. */
+export const DETECT_SAMPLE_CP = 1000;
 
 interface PromptShape {
   system: string;

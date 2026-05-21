@@ -3,10 +3,11 @@ import { cors } from "hono/cors";
 import type { AnalysisKind, AnalyzeResponse, DetectArticleResponse } from "@newtrospect/core/server";
 import { MIN_BODY_LENGTH, sha256Hex } from "@newtrospect/core/server";
 import type { Env } from "./env.ts";
-import { cacheTtlSec, modelFor, providerFor } from "./env.ts";
-import { readCache, writeCache, logRequest } from "./cache.ts";
-import { workersAIProvider } from "./providers/workers-ai.ts";
+import { cacheTtlSec, detectModel, detectProvider, modelFor, providerFor } from "./env.ts";
+import { logRequest, readCache, readDetectCache, writeCache, writeDetectCache } from "./cache.ts";
+import { workersAIProvider, extractText } from "./providers/workers-ai.ts";
 import type { AIProvider } from "./provider.ts";
+import { DETECT_PROMPT, DETECT_SAMPLE_CP } from "./prompts.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -29,6 +30,7 @@ app.get("/health", (c) => {
       sensational: modelFor(env, "sensational"),
       quantitative: modelFor(env, "quantitative"),
       context: modelFor(env, "context"),
+      detect: detectModel(env),
     },
     cacheTtlSec: cacheTtlSec(env),
   });
@@ -37,38 +39,89 @@ app.get("/health", (c) => {
 /**
  * 본문 평문을 받아 (a) 뉴스 기사 여부 (b) 정제된 본문 반환.
  * URL fetch 는 하지 않는다 — 봇 차단·로그인 벽 회피 정책.
+ *
+ * 2026-05-21: 휴리스틱(길이)만 보던 것을 AI 판정으로 격상.
+ * 셀렉터 dictionary 가 없는 사이트에서도 폴백 추출 + AI 판정으로 대응.
+ * cleanedText 는 좌표 보존 위해 *입력 그대로 normalize* — AI 가 변형하지 않는다.
  */
-app.post("/api/detect-article", async (c) => {
-  const body: { text?: string; url?: string } = await c.req.json().catch(() => ({}));
-  const text = (body.text ?? "").trim();
-  if (text.length < MIN_BODY_LENGTH) {
-    return c.json<DetectArticleResponse>({
-      isArticle: false,
-      cleanedText: "",
-      reason: `본문이 ${MIN_BODY_LENGTH}자 미만 (단신·페이월 추정)`,
-    });
-  }
-  // Phase 1: 휴리스틱만. 추후 AI 판독 가능.
-  const cleaned = text.replace(/\s+/g, " ").trim();
-  return c.json<DetectArticleResponse>({
-    isArticle: true,
-    cleanedText: cleaned,
-  });
-});
+app.post("/api/detect-article", (c) => handleDetect(c.env, c.req.raw));
 
 const KINDS: readonly AnalysisKind[] = ["term", "sensational", "quantitative", "context"];
 for (const kind of KINDS) {
   app.post(`/api/analyze/${kind === "term" ? "terms" : kind}`, (c) => handleAnalyze(c.env, c.req.raw, kind));
 }
 
+async function handleDetect(env: Env, req: Request): Promise<Response> {
+  const reqOrigin = req.headers.get("origin");
+  const host = parseHost(reqOrigin);
+
+  const body = (await req.json().catch(() => ({}))) as { text?: string; url?: string };
+  const text = (body.text ?? "").trim();
+  const cleaned = text.replace(/\s+/g, " ").trim();
+
+  if (cleaned.length < MIN_BODY_LENGTH) {
+    await logRequest(env, { host, kind: "detect", model: null, elapsedMs: null, statusCode: 200, cacheHit: false });
+    return Response.json({
+      isArticle: false,
+      cleanedText: "",
+      reason: `본문이 ${MIN_BODY_LENGTH}자 미만 (단신·페이월·UI 텍스트 추정)`,
+    });
+  }
+
+  const bodyHash = await sha256Hex(cleaned);
+  const cached = await readDetectCache(env, bodyHash);
+  if (cached) {
+    await logRequest(env, { host, kind: "detect", model: null, elapsedMs: null, statusCode: 200, cacheHit: true });
+    return Response.json(cached);
+  }
+
+  if (detectProvider(env) !== "workers-ai") {
+    // 지금은 workers-ai 만. 다른 provider 는 추후.
+    await logRequest(env, { host, kind: "detect", model: null, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "detect_provider_not_supported" }, { status: 500 });
+  }
+
+  const model = detectModel(env);
+  const t0 = Date.now();
+  const sample = sliceCp(cleaned, DETECT_SAMPLE_CP);
+
+  try {
+    const raw = await env.AI.run(model as Parameters<Ai["run"]>[0], {
+      messages: [
+        { role: "system", content: DETECT_PROMPT },
+        { role: "user", content: sample },
+      ],
+      max_tokens: 96,
+      temperature: 0.1,
+    });
+    const text = extractText(raw);
+    const parsed = parseDetect(text);
+    const elapsedMs = Date.now() - t0;
+    const response: DetectArticleResponse = {
+      isArticle: parsed.isArticle,
+      cleanedText: parsed.isArticle ? cleaned : "",
+      reason: parsed.reason,
+    };
+    await writeDetectCache(env, bodyHash, model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "detect", model, elapsedMs, statusCode: 200, cacheHit: false });
+    return Response.json(response);
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[detect] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "detect", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    // 안전한 폴백 — AI 호출 실패 시엔 길이 기반 휴리스틱으로 일단 통과시킴.
+    // 분석 endpoint 가 어차피 한 번 더 검증한다.
+    return Response.json({
+      isArticle: true,
+      cleanedText: cleaned,
+      reason: "ai_unavailable_heuristic_pass",
+    });
+  }
+}
+
 async function handleAnalyze(env: Env, req: Request, kind: AnalysisKind): Promise<Response> {
   const reqOrigin = req.headers.get("origin");
-  let host: string | null = null;
-  try {
-    host = reqOrigin ? new URL(reqOrigin).hostname : null;
-  } catch {
-    host = null;
-  }
+  const host = parseHost(reqOrigin);
 
   const body = (await req.json().catch(() => ({}))) as { text?: string };
   const text = (body.text ?? "").trim();
@@ -112,6 +165,39 @@ function resolveProvider(name: string): AIProvider | null {
   if (name === "workers-ai") return workersAIProvider;
   // gemini provider 는 Workers AI 품질이 부족하다고 판단될 때 추가.
   return null;
+}
+
+function parseHost(origin: string | null): string | null {
+  if (!origin) return null;
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function sliceCp(s: string, n: number): string {
+  const cps = Array.from(s);
+  return cps.length <= n ? s : cps.slice(0, n).join("");
+}
+
+/** detect AI 응답 파서 — JSON 외 잡설을 관용적으로 처리. */
+function parseDetect(raw: string): { isArticle: boolean; reason?: string } {
+  if (!raw) return { isArticle: false, reason: "ai_empty_response" };
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first < 0 || last <= first) {
+    // JSON 형식이 아니면 보수적으로 통과 — 다음 단계(분석)가 한 번 더 검증.
+    return { isArticle: true, reason: "ai_unparseable_pass" };
+  }
+  try {
+    const obj = JSON.parse(raw.slice(first, last + 1)) as { isArticle?: unknown; reason?: unknown };
+    const isArticle = obj.isArticle === true;
+    const reason = typeof obj.reason === "string" ? obj.reason : undefined;
+    return { isArticle, reason };
+  } catch {
+    return { isArticle: true, reason: "ai_unparseable_pass" };
+  }
 }
 
 export default app;

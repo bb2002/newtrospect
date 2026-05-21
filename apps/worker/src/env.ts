@@ -8,11 +8,13 @@ export interface Env {
   PROVIDER_SENSATIONAL: string;
   PROVIDER_QUANTITATIVE: string;
   PROVIDER_CONTEXT: string;
+  PROVIDER_DETECT: string;
 
   MODEL_TERM: string;
   MODEL_SENSATIONAL: string;
   MODEL_QUANTITATIVE: string;
   MODEL_CONTEXT: string;
+  MODEL_DETECT: string;
 
   CACHE_TTL_SEC: string;
 }
@@ -37,6 +39,14 @@ export function providerFor(env: Env, kind: AnalysisKind): string {
 
 export function modelFor(env: Env, kind: AnalysisKind): string {
   return env[MODEL_KEY[kind]] as string;
+}
+
+export function detectProvider(env: Env): string {
+  return env.PROVIDER_DETECT;
+}
+
+export function detectModel(env: Env): string {
+  return env.MODEL_DETECT;
 }
 
 export function cacheTtlSec(env: Env): number {
