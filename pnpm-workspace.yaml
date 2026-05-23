@@ -1,3 +1,6 @@
 packages:
-  - "apps/*"
+  - "apps/extension"
+  - "apps/worker"
   - "packages/*"
+# apps/mobile 은 Expo 호환성 문제로 pnpm workspace 에서 제외.
+# 자체 npm 으로 관리하며 @newtrospect/core 는 file: 의존성으로 참조.

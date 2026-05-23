@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+android/
+ios/
+*.log
+.DS_Store
+package-lock.json.bak
+
+# injection 번들은 *의도적으로 커밋*. EAS cloud 의 esbuild 환경 차이를 회피하기 위해
+# 로컬에서 빌드한 산출물을 그대로 배포에 사용. 변경 시 prestart/postinstall 훅이
+# 자동 갱신하니 신경 쓸 필요 없음.

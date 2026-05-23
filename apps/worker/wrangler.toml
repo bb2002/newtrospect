@@ -27,13 +27,13 @@ PROVIDER_TERM = "gemini"
 PROVIDER_SENSATIONAL = "gemini"
 PROVIDER_QUANTITATIVE = "gemini"
 PROVIDER_CONTEXT = "gemini"
-PROVIDER_DETECT = "workers-ai"
+PROVIDER_DETECT = "gemini"
 
 MODEL_TERM = "gemini-3.1-flash-lite-preview"
 MODEL_SENSATIONAL = "gemini-3.1-flash-lite-preview"
 MODEL_QUANTITATIVE = "gemini-3.1-flash-lite-preview"
 MODEL_CONTEXT = "gemini-3.1-flash-lite-preview"
-MODEL_DETECT = "@cf/meta/llama-3.1-8b-instruct"
+MODEL_DETECT = "gemini-3.1-flash-lite-preview"
 
 # 캐시 TTL (초). 1시간.
 CACHE_TTL_SEC = "3600"

@@ -7,7 +7,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  apiBaseUrl: "http://127.0.0.1:8787",
+  // 배포된 워커. 로컬 개발 시엔 옵션 화면에서 http://127.0.0.1:8787 로 덮어쓸 것.
+  apiBaseUrl: "https://newtrospect-worker.ballbot.workers.dev",
   autoDetect: true,
   enabled: {
     term: true,

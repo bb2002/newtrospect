@@ -40,8 +40,8 @@ async function run(introspectMode = false): Promise<void> {
     return;
   }
 
-  const { text, host, selectorUsed } = extractArticleText(document, location.href);
-  console.log("[newtrospect] extracted", { host, selectorUsed, textLen: text.length });
+  const { text, host, selectorUsed, source } = extractArticleText(document, location.href);
+  console.log("[newtrospect] extracted", { host, selectorUsed, source, textLen: text.length });
   if (text.length < MIN_BODY_LENGTH) {
     console.log("[newtrospect] text too short, skipping");
     if (introspectMode) updateBadge({ phase: "skip", done: 0, total: 0 });
@@ -89,7 +89,11 @@ async function run(introspectMode = false): Promise<void> {
       try {
         const res = await client.analyze(kind, detect.cleanedText);
         if (ac.signal.aborted) return;
-        applyHighlights(root, res.spans as Span[]);
+        // 워커가 반환한 spans 는 detect.cleanedText (=extract 된 본문) 좌표계.
+        // highlight 는 root.textContent 누적 offset 기준이라 좌표 변환 필요.
+        // Readability fallback 시 cleanedText 가 root 의 일부분이므로 더 결정적.
+        const relocated = relocateSpansToRoot(res.spans as Span[], detect.cleanedText, root);
+        applyHighlights(root, relocated);
       } catch {
         errors++;
       } finally {
@@ -109,6 +113,50 @@ async function run(introspectMode = false): Promise<void> {
   } else {
     updateBadge({ phase: "ok", done, total: enabledKinds.length });
   }
+}
+
+/**
+ * 워커가 보낸 spans 의 좌표를 *root.textContent 기준 cp offset* 으로 재매핑.
+ *
+ * 왜 필요한가:
+ *   - 워커가 받은 본문 (= detect.cleanedText, = extract().text) 은 normalize 된 평문.
+ *   - Readability fallback 시 cleanedText 는 root.textContent 의 *일부분* (메뉴·푸터 제외).
+ *   - highlight.ts 는 root.textContent 누적 offset 기준이라 그대로 쓰면 위치가 어긋남.
+ *
+ * 방법:
+ *   - 각 span 의 텍스트(=cleanedText.slice(start,end)) 를 root.textContent 에서 다시 찾기.
+ *   - 직접 indexOf 가 실패하면 공백을 \s+ 로 관대하게 매칭 (cleanedText 는 normalize 거쳐
+ *     공백이 단일화됐지만 root 원본은 개행·연속 공백이 살아 있음).
+ *   - 찾으면 cp offset 으로 변환해 반환. 못 찾으면 그 span 은 버림 (조용한 실패).
+ */
+function relocateSpansToRoot(spans: Span[], cleanedText: string, rootElement: Element): Span[] {
+  const rootText = rootElement.textContent ?? "";
+  const cleanedCps = Array.from(cleanedText);
+
+  const out: Span[] = [];
+  for (const s of spans) {
+    const spanText = cleanedCps.slice(s.start, s.end).join("");
+    if (!spanText) continue;
+
+    // 1차: raw substring 매치 (대부분 케이스)
+    let utf16Start = rootText.indexOf(spanText);
+    let matchedLen = spanText.length;
+
+    if (utf16Start < 0) {
+      // 2차: 공백 관대 매치 — span 텍스트의 \s+ 를 정규식 \s+ 로 치환해 검색
+      const escaped = spanText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+      const re = new RegExp(escaped);
+      const m = rootText.match(re);
+      if (!m || m.index === undefined) continue;
+      utf16Start = m.index;
+      matchedLen = m[0].length;
+    }
+
+    const newStart = Array.from(rootText.slice(0, utf16Start)).length;
+    const newEnd = newStart + Array.from(rootText.slice(utf16Start, utf16Start + matchedLen)).length;
+    out.push({ ...s, start: newStart, end: newEnd });
+  }
+  return out;
 }
 
 function currentArticleRoot(): Element | null {

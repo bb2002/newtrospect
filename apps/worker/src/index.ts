@@ -8,6 +8,7 @@ import { workersAIProvider, extractText } from "./providers/workers-ai.ts";
 import { geminiProvider } from "./providers/gemini.ts";
 import type { AIProvider } from "./provider.ts";
 import { DETECT_PROMPT, DETECT_SAMPLE_CP } from "./prompts.ts";
+import { privacyHtml } from "./privacy.ts";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -41,6 +42,14 @@ app.use("*", async (c, next) => {
   c.header("Access-Control-Allow-Private-Network", "true");
   c.header("Vary", "Origin");
 });
+
+app.get("/privacy", (c) => {
+  return c.html(privacyHtml(), 200, {
+    "Cache-Control": "public, max-age=300",
+  });
+});
+
+app.get("/", (c) => c.redirect("/privacy", 302));
 
 app.get("/health", (c) => {
   const env = c.env;
@@ -96,8 +105,8 @@ async function handleDetect(env: Env, req: Request): Promise<Response> {
     return Response.json(cached);
   }
 
-  if (detectProvider(env) !== "workers-ai") {
-    // 지금은 workers-ai 만. 다른 provider 는 추후.
+  const provider = detectProvider(env);
+  if (provider !== "workers-ai" && provider !== "gemini") {
     await logRequest(env, { host, kind: "detect", model: null, elapsedMs: null, statusCode: 500, cacheHit: false });
     return Response.json({ error: "detect_provider_not_supported" }, { status: 500 });
   }
@@ -107,15 +116,9 @@ async function handleDetect(env: Env, req: Request): Promise<Response> {
   const sample = sliceCp(cleaned, DETECT_SAMPLE_CP);
 
   try {
-    const raw = await env.AI.run(model as Parameters<Ai["run"]>[0], {
-      messages: [
-        { role: "system", content: DETECT_PROMPT },
-        { role: "user", content: sample },
-      ],
-      max_tokens: 96,
-      temperature: 0.1,
-    });
-    const text = extractText(raw);
+    const text = provider === "gemini"
+      ? await runDetectGemini(env, model, sample)
+      : await runDetectWorkersAI(env, model, sample);
     const parsed = parseDetect(text);
     const elapsedMs = Date.now() - t0;
     const response: DetectArticleResponse = {
@@ -195,6 +198,46 @@ function parseHost(origin: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+async function runDetectWorkersAI(env: Env, model: string, sample: string): Promise<string> {
+  const raw = await env.AI.run(model as Parameters<Ai["run"]>[0], {
+    messages: [
+      { role: "system", content: DETECT_PROMPT },
+      { role: "user", content: sample },
+    ],
+    max_tokens: 96,
+    temperature: 0.1,
+  });
+  return extractText(raw);
+}
+
+async function runDetectGemini(env: Env, model: string, sample: string): Promise<string> {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY missing — wrangler secret put GEMINI_API_KEY");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    systemInstruction: { parts: [{ text: DETECT_PROMPT }] },
+    contents: [{ role: "user", parts: [{ text: sample }] }],
+    generationConfig: {
+      temperature: 0.1,
+      response_mime_type: "application/json",
+      maxOutputTokens: 128,
+    },
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`gemini ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
 function sliceCp(s: string, n: number): string {

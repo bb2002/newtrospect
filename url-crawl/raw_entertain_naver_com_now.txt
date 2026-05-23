@@ -1,0 +1,75 @@
+--- BEGIN UNTRUSTED EXTERNAL CONTENT (source: https://m.entertain.naver.com/now) ---
+본문 바로가기 → https://m.entertain.naver.com/now#content
+NAVER → https://www.naver.com/
+엔터 → https://m.entertain.naver.com/home
+뉴스 → https://news.naver.com/
+스포츠 → https://sports.naver.com/
+로그인 → https://m.entertain.naver.com/now#
+내정보 보기 → javascript:;
+(임직원혜택) → https://m.entertain.naver.com/now#
+프로필 사진 변경 → https://nid.naver.com/user2/api/naverProfile?m=checkIdType
+_ → https://nid.naver.com/user2/api/naverProfile?m=checkIdType
+로그아웃 → https://m.entertain.naver.com/now#
+@naver.com → https://mail.naver.com/
+네이버ID → https://nid.naver.com/user2/help/myInfo?menu=home
+보안설정 → https://nid.naver.com/user2/help/myInfo?m=viewSecurity&menu=security
+내인증서 → https://nid.naver.com/user2/eSign/v1/home/land
+네이버 멤버쉽 → https://nid.naver.com/membership/my
+내 페이포인트 → https://point.pay.naver.com/
+내 블로그 → https://blog.naver.com/MyBlog.naver
+가입한 카페 → https://section.cafe.naver.com/
+N Pay → https://pay.naver.com/
+네이버 멤버십 최대 5% 적립 → https://nid.naver.com/membership/join
+환경설정 → https://m.entertain.naver.com/now#
+알림 → https://m.notify.naver.com/?from=pcmain
+내 알림 전체보기 → https://m.notify.naver.com/?from=pcmain
+메일 → https://mail.naver.com/
+서비스 더보기 → javascript:;
+닫기 → https://m.entertain.naver.com/now#
+추가 → https://m.entertain.naver.com/now#
+추가 → https://m.entertain.naver.com/now#
+추가 → https://m.entertain.naver.com/now#
+추가 → https://m.entertain.naver.com/now#
+즐겨찾기 설정 → https://m.entertain.naver.com/now#
+삭제 → https://m.entertain.naver.com/now#
+카페 → https://cafe.naver.com/
+뉴스 → https://news.naver.com/
+웹툰 → https://comic.naver.com/
+도서 → https://book.naver.com/
+지식iN → https://kin.naver.com/
+블로그 → https://section.blog.naver.com/
+증권 → https://stock.naver.com/
+치지직 → https://chzzk.naver.com/
+사전 → https://dict.naver.com/
+캘린더 → https://calendar.naver.com/
+메일 → https://mail.naver.com/
+부동산 → https://land.naver.com/
+날씨 → https://weather.naver.com/
+스포츠 → https://m.sports.naver.com/index
+MYBOX → https://mybox.naver.com/
+스토어 → https://shopping.naver.com/ns/home
+지도 → https://map.naver.com/
+페이 → https://pay.naver.com/
+웹소설 → https://novel.naver.com/webnovel/weekday
+VIBE → https://vibe.naver.com/today/
+전체 서비스 보기 → https://www.naver.com/more.html
+전체 서비스 보기 → https://www.naver.com/more.html
+어학사전 → https://dict.naver.com/
+홈 → https://m.entertain.naver.com/home
+드라마 → https://m.entertain.naver.com/drama
+영화 → https://m.entertain.naver.com/movie
+뮤직 → https://m.entertain.naver.com/music
+연애 → https://m.entertain.naver.com/relationship
+포토 → https://m.entertain.naver.com/photo
+랭킹 → https://m.entertain.naver.com/ranking
+최신뉴스 → https://m.entertain.naver.com/now
+연재 → https://m.entertain.naver.com/series
+전체 → https://m.entertain.naver.com/now
+연예가화제 → https://m.entertain.naver.com/now?sid=221
+방송ㆍTV → https://m.entertain.naver.com/now?sid=224
+영화 → https://m.entertain.naver.com/now?sid=222
+드라마 → https://m.entertain.naver.com/now?sid=225
+뮤직 → https://m.entertain.naver.com/now?sid=7a5
+해외연예 → https://m.entertain.naver.com/now?sid=309
+포토 → https://m.entertain.naver.com/now?articleType=1
+--- END UNTRUSTED EXTERNAL CONTENT ---

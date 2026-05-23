@@ -1,24 +1,39 @@
 {
   "name": "@newtrospect/mobile",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "Expo Go + react-native-webview 안드로이드 앱 (S1 spike 단계)",
+  "description": "newtrospect Android WebView 앱 — 한국 뉴스 4색 인라인 분석 (Expo SDK 51 managed, npm 독립 관리)",
   "main": "index.ts",
   "scripts": {
+    "build:injection": "node scripts/build-injection.mjs",
+    "build:icons": "node scripts/build-icons.mjs",
+    "prestart": "npm run build:injection",
     "start": "expo start",
-    "android": "expo start --android",
-    "typecheck": "tsc --noEmit"
+    "preandroid": "npm run build:injection",
+    "android": "expo run:android",
+    "prebuild:apk": "npm run build:injection",
+    "build:apk": "eas build --platform android --profile preview",
+    "build:apk:local": "eas build --platform android --profile preview --local",
+    "typecheck": "tsc --noEmit",
+    "ios": "expo run:ios"
   },
   "dependencies": {
-    "expo": "~51.0.39",
-    "expo-status-bar": "~1.12.1",
-    "react": "18.2.0",
-    "react-native": "0.74.5",
-    "react-native-webview": "13.8.6"
+    "@mozilla/readability": "^0.6.0",
+    "@newtrospect/core": "file:../../packages/core",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "^54.0.0",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-webview": "13.15.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
-    "@types/react": "~18.2.79",
-    "typescript": "^5.6.3"
+    "@babel/core": "^7.25.0",
+    "@types/react": "~19.1.0",
+    "babel-preset-expo": "~54.0.0",
+    "esbuild": "^0.24.0",
+    "typescript": "~5.9.2"
   }
 }

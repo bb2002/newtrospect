@@ -1,17 +1,37 @@
 {
   "expo": {
-    "name": "newtrospect-spike",
-    "slug": "newtrospect-spike",
+    "name": "newtrospect",
+    "slug": "newtrospect",
     "version": "0.0.1",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": false,
+    "jsEngine": "hermes",
+    "platforms": ["android"],
+    "icon": "./assets/icon.png",
     "android": {
-      "package": "io.alignnetworks.newtrospect.spike"
+      "package": "io.newtrospect.app",
+      "versionCode": 1,
+      "permissions": ["INTERNET"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1c1c20"
+      }
     },
-    "ios": {
-      "bundleIdentifier": "io.alignnetworks.newtrospect.spike",
-      "supportsTablet": false
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1c1c20",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d40663f6-abff-4f94-af1d-710dbe54adf9"
+      }
     }
   }
 }

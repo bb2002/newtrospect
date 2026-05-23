@@ -21,7 +21,7 @@ export default defineManifest({
       run_at: "document_idle",
     },
   ],
-  permissions: ["storage", "activeTab", "scripting"],
-  host_permissions: ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
+  permissions: ["storage", "activeTab"],
+  host_permissions: ["https://*/*"],
   icons: { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
 });

@@ -1,0 +1,13 @@
+--- BEGIN UNTRUSTED EXTERNAL CONTENT (source: https://news.zum.com/section/society) ---
+뉴스줌 → https://news.zum.com/
+고객센터 → https://help.zum.com/faq
+이전으로 가기 → javascript:history.back();
+줌닷컴 메인으로 가기 → https://zum.com/
+서비스소개 → https://www.estaid.ai/service_zum
+이용약관 → https://policy.zum.com/terms/
+개인정보처리방침 → https://policy.zum.com/info
+제휴 → https://help.zum.com/partnership/news
+채용 → https://estfamily.career.greetinghr.com/ko/home?divisions=ESTaid
+고객센터 → https://help.zum.com/home
+©ESTaid Corp. → https://www.estaid.ai/
+--- END UNTRUSTED EXTERNAL CONTENT ---
