@@ -1,9 +1,9 @@
 /**
  * 콘텐츠 스크립트에서 페이지에 주입할 스타일.
  *
- * 노란 배경(context) 위에 inline 강조가 *덮이지 않고 공존* 하도록:
- * - context: 노란 배경만, 다른 색은 inline 자손 으로 들어옴
- * - sensational/quantitative/term: 색별 배경 + 하단 밑줄. cursor: pointer (popover)
+ * context(핵심 문장)는 *bold + 밑줄* — 책에서 가장 중요한 부분에 줄 긋는 metaphor.
+ * 노란 배경 사용 안 함 (2026-05-26 디자인 변경).
+ * sensational/quantitative/term 은 색별 배경 + 하단 밑줄 + cursor: pointer (popover).
  */
 
 export const HIGHLIGHT_STYLES = `
@@ -13,8 +13,12 @@ nts-mark {
   padding: 0 1px;
 }
 nts-mark.nts-context {
-  background: rgba(255, 220, 90, 0.42);
-  border-radius: 1px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: #000;
+  text-decoration-skip-ink: none;
 }
 nts-mark.nts-sensational {
   background: rgba(255, 90, 90, 0.32);
@@ -31,11 +35,8 @@ nts-mark.nts-term {
   box-shadow: inset 0 -1px 0 rgba(20, 80, 200, 0.55);
   cursor: pointer;
 }
-/* context 안에 들어가는 다른 색은 자체 배경 위에 덧칠. 노란 배경은 부모(context) 가 깔아준다. */
-nts-mark.nts-context nts-mark { background-color: inherit; }
-nts-mark.nts-context nts-mark.nts-sensational { background: rgba(255, 90, 90, 0.36); }
-nts-mark.nts-context nts-mark.nts-quantitative { background: rgba(80, 200, 120, 0.36); }
-nts-mark.nts-context nts-mark.nts-term { background: rgba(90, 150, 255, 0.36); }
+/* context 안에 들어가는 다른 색은 자체 배경 + bold/밑줄 상속. */
+nts-mark.nts-context nts-mark { font-weight: inherit; }
 `;
 
 export function injectStyles(): void {

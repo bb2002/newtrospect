@@ -86,12 +86,9 @@ function ensureStyles(): void {
       font-size: 12px; color: #6a7290;
     }
     #${CARDS_ID} .nts-cards-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-    @media (max-width: 720px) {
-      #${CARDS_ID} .nts-cards-grid { grid-template-columns: 1fr; }
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
     #${CARDS_ID} .nts-card {
       position: relative;
