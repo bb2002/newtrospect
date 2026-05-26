@@ -1,4 +1,5 @@
 import type { AnalysisKind, Span } from "@newtrospect/core/server";
+import { attachMarkClickHandler } from "./popover.ts";
 
 /**
  * DOM 하이라이트 적용.
@@ -130,9 +131,19 @@ export function applyHighlights(root: Element, spans: Span[]): void {
   const contextSpans = spans.filter((s): s is Extract<Span, { kind: "context" }> => s.kind === "context");
   const inlineSpans = suppressTermQuantitativeOverlap(spans.filter((s) => s.kind !== "context"));
 
-  // Pass 1: context 노란 배경 먼저 (서로 겹치면 합치되, 색은 노랑 유지)
+  // Pass 1: context (bold+밑줄) 먼저 wrap.
+  // *클릭 가능성 보강* — context mark 의 payload 에 그 영역과 겹치는 inline spans 도 같이 저장.
+  // Pass 2 의 inline wrap 이 Range.surroundContents partial-coverage 등으로 실패해도,
+  // click 이 context mark 에 떨어지면 popover 가 inline 정보로 표시될 수 있게.
   if (contextSpans.length > 0) {
     const merged = mergeInlineOverlaps(contextSpans);
+    for (const mark of merged) {
+      for (const inline of inlineSpans) {
+        if (inline.start < mark.end && inline.end > mark.start) {
+          mark.all.push(inline);
+        }
+      }
+    }
     const { pieces } = collectTextPieces(root);
     for (const mark of merged.slice().reverse()) applyMark(pieces, mark);
   }
@@ -169,10 +180,28 @@ function applyMark(pieces: TextPiece[], mark: MergedMark): void {
     wrap.className = HIGHLIGHT_CLASS[mark.primary];
     wrap.dataset.kinds = Array.from(new Set(mark.all.map((s) => s.kind))).join(",");
     wrap.dataset.payload = JSON.stringify(mark.all);
+    // 각 mark 에 직접 click/touch listener 단단 — document delegation 의 한계 우회.
+    attachMarkClickHandler(wrap);
     try {
       range.surroundContents(wrap);
     } catch {
-      // partial coverage (Range crosses element boundary) — 본 cut 에선 스킵
+      // surroundContents 가 partial coverage 로 실패하는 케이스 — splitText 방식으로 fallback.
+      // 같은 text 노드 내부 일부분이면 안전하게 split → 가운데 조각을 wrap 안에 넣음.
+      if (
+        range.startContainer === range.endContainer &&
+        range.startContainer.nodeType === Node.TEXT_NODE
+      ) {
+        const textNode = range.startContainer as Text;
+        const startOff = range.startOffset;
+        const endOff = range.endOffset;
+        const target = textNode.splitText(startOff);
+        target.splitText(endOff - startOff);
+        const parent = target.parentNode;
+        if (parent) {
+          parent.insertBefore(wrap, target);
+          wrap.appendChild(target);
+        }
+      }
     }
   }
 }

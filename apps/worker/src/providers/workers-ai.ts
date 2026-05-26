@@ -1,6 +1,6 @@
 import type { AIProvider, AnalyzeArgs, AnalyzeResult } from "../provider.ts";
 import type { Env } from "../env.ts";
-import { PROMPTS } from "../prompts.ts";
+import { PROMPTS, withTimeHeader } from "../prompts.ts";
 import { matchSpans } from "../match-spans.ts";
 import type { RawItem } from "../match-spans.ts";
 
@@ -11,7 +11,7 @@ export const workersAIProvider: AIProvider = {
 
     const response = await env.AI.run(args.model as Parameters<Ai["run"]>[0], {
       messages: [
-        { role: "system", content: prompt.system },
+        { role: "system", content: withTimeHeader(prompt.system) },
         { role: "user", content: args.text },
       ],
       // 긴 본문 대응 — 모델별 한도(보통 ~4096)에 맞춰 큼지막하게. (specs/05)

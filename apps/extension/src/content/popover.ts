@@ -38,19 +38,38 @@ const POPOVER_PRIORITY: Record<Exclude<AnalysisKind, "context">, number> = {
 
 let currentTarget: HTMLElement | null = null;
 
-export function bindPopovers(root: Element, opts: PopoverOptions): void {
+/**
+ * popover 시스템 초기화 — opts 만 주입. 실제 click listener 는 *각 nts-mark element 에*
+ * 직접 단단 (attachMarkClickHandler) — document delegation 의존성 제거.
+ *
+ * 왜 per-element 인가:
+ *   - 페이지 자체 script 가 stopPropagation 으로 bubble 을 가로채는 사이트가 있음
+ *   - 모바일 WebView 에서 click 이 touch 로부터 합성 안 되는 케이스가 있음
+ *   - context bold+밑줄 안에 nested 된 inline mark 가 hit-test 안 잡히는 보고
+ *   → element 자체에 listener 면 위 케이스 다 우회.
+ */
+export function setupPopovers(opts: PopoverOptions): void {
   popoverOpts = opts;
   ensureStyles();
-  // 한 번만 바인딩 — content script 가 root 새로 잡을 때마다 재호출됨
-  root.removeEventListener("click", onRootClick as EventListener);
-  root.addEventListener("click", onRootClick as EventListener);
   document.removeEventListener("click", onDocClick);
   document.addEventListener("click", onDocClick);
 }
 
-function onRootClick(ev: MouseEvent): void {
-  const target = (ev.target as HTMLElement)?.closest?.("nts-mark") as HTMLElement | null;
-  if (!target) return;
+/** highlight.ts 가 wrap 직후 호출 — 각 mark 에 click+touch listener 단단. */
+export function attachMarkClickHandler(el: HTMLElement): void {
+  el.addEventListener("click", onMarkInteract);
+  // touch 가 click 으로 합성 안 되는 일부 WebView 대비. passive:false 로 preventDefault 가능.
+  el.addEventListener("touchend", onMarkInteract, { passive: false });
+}
+
+let lastHandledTs = 0;
+function onMarkInteract(ev: Event): void {
+  // click + touchend 가 모두 발생하는 정상 case 의 double-trigger dedupe.
+  const now = Date.now();
+  if (now - lastHandledTs < 300) return;
+  lastHandledTs = now;
+
+  const target = ev.currentTarget as HTMLElement;
   ev.stopPropagation();
   ev.preventDefault();
 
@@ -66,6 +85,11 @@ function onDocClick(ev: MouseEvent): void {
   if (!t) return;
   if (t.closest("nts-mark") || t.closest(`#${POPOVER_ID}`)) return;
   hidePopover();
+}
+
+/** @deprecated setupPopovers + attachMarkClickHandler 사용. 하위 호환용. */
+export function bindPopovers(_root: Element, opts: PopoverOptions): void {
+  setupPopovers(opts);
 }
 
 function showPopover(target: HTMLElement): void {

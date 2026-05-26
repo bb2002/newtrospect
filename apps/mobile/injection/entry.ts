@@ -21,6 +21,8 @@ import type { AnalysisKind, Span } from "@newtrospect/core/server";
 import { applyHighlights } from "./highlight";
 import { bindPopovers, hidePopover } from "./popover";
 import { injectStyles } from "./styles";
+import { renderCards, renderOneline, removeCardsAndOneline } from "./cards";
+import { renderCharacter, removeCharacter } from "./character";
 
 interface InjectionConfig {
   apiBaseUrl: string;
@@ -135,7 +137,13 @@ async function run(introspect = false): Promise<void> {
     post({ type: "phase", phase: "error", message: "본문 요소를 찾을 수 없음" });
     return;
   }
-  bindPopovers(root);
+  bindPopovers(root, {
+    // specs/03 — '온화한 표현으로 보기' 버튼이 호출.
+    rewriteSensational: async (text, reason) => {
+      const r = await client.rewriteSensational(text, reason);
+      return r.rewritten;
+    },
+  });
 
   const enabled = KINDS.filter((k) => g.config.enabled[k]);
   if (enabled.length === 0) {
@@ -143,34 +151,103 @@ async function run(introspect = false): Promise<void> {
     return;
   }
 
+  // 7개 AI 병렬 호출:
+  //   1~4: 색깔 마킹 (term / sensational / quantitative / context)
+  //   5:   briefing (3장 카드, Pro 모델)
+  //   6:   oneline  (한 줄 요약, flash 모델)
+  //   7:   character (글 성격 7신호, flash 모델)
+  // rewrite 는 사용자 탭 트리거라 이 묶음에 포함 안 함.
+  const cleanedText = detect.cleanedText;
+  const total = enabled.length + 3;
   let done = 0;
   let errors = 0;
-  post({ type: "phase", phase: "analyzing", done, total: enabled.length, errors });
+  const tick = (failed: boolean): void => {
+    if (failed) errors++;
+    done++;
+    if (!ac.signal.aborted) {
+      post({ type: "phase", phase: "analyzing", done, total, errors });
+    }
+  };
+  post({ type: "phase", phase: "analyzing", done, total, errors });
 
-  await Promise.allSettled(
-    enabled.map(async (kind) => {
-      try {
-        const res = await client.analyze(kind, detect.cleanedText);
-        if (ac.signal.aborted) return;
-        const relocated = relocateSpansToRoot(res.spans as Span[], detect.cleanedText, root);
-        applyHighlights(root, relocated);
-      } catch {
-        errors++;
-      } finally {
-        done++;
-        if (!ac.signal.aborted) {
-          post({ type: "phase", phase: "analyzing", done, total: enabled.length, errors });
-        }
+  // character.sensational 과 sensational spans 간 일관성 보정.
+  let sensationalSpanCount = 0;
+  let sensationalDone = false;
+  let pendingCharacter: import("@newtrospect/core/server").CharacterResponse | null = null;
+  const tryRenderCharacter = (): void => {
+    if (!pendingCharacter || !sensationalDone) return;
+    if (sensationalSpanCount === 0 && pendingCharacter.signals.sensational > 1) {
+      pendingCharacter = {
+        ...pendingCharacter,
+        signals: { ...pendingCharacter.signals, sensational: 1 },
+      };
+    }
+    renderCharacter(root, pendingCharacter);
+    pendingCharacter = null;
+  };
+
+  const spanTasks = enabled.map(async (kind) => {
+    try {
+      const res = await client.analyze(kind, cleanedText);
+      if (ac.signal.aborted) return;
+      const relocated = relocateSpansToRoot(res.spans as Span[], cleanedText, root);
+      applyHighlights(root, relocated);
+      if (kind === "sensational") {
+        sensationalSpanCount = (res.spans as Span[]).length;
+        sensationalDone = true;
+        tryRenderCharacter();
       }
-    }),
-  );
+      tick(false);
+    } catch {
+      if (kind === "sensational") {
+        sensationalDone = true;
+        tryRenderCharacter();
+      }
+      tick(true);
+    }
+  });
+
+  const briefingTask = client
+    .briefing(cleanedText)
+    .then((b) => {
+      if (ac.signal.aborted) return;
+      renderCards(root, b);
+      tick(false);
+    })
+    .catch(() => tick(true));
+
+  const onelineTask = client
+    .oneline(cleanedText)
+    .then((o) => {
+      if (ac.signal.aborted) return;
+      renderOneline(root, o);
+      tick(false);
+    })
+    .catch(() => tick(true));
+
+  const characterTask = client
+    .character(cleanedText)
+    .then((c) => {
+      if (ac.signal.aborted) return;
+      pendingCharacter = c;
+      tryRenderCharacter();
+      tick(false);
+    })
+    .catch(() => tick(true));
+
+  await Promise.allSettled([...spanTasks, briefingTask, onelineTask, characterTask]);
+
+  if (pendingCharacter) {
+    sensationalDone = true;
+    tryRenderCharacter();
+  }
 
   if (ac.signal.aborted) return;
   post({
     type: "phase",
-    phase: errors === enabled.length ? "error" : "ok",
+    phase: errors === total ? "error" : "ok",
     done,
-    total: enabled.length,
+    total,
     errors,
   });
 }
@@ -200,6 +277,8 @@ function onUrlChange(): void {
   g._lastUrl = location.href;
   g._inflight?.abort();
   hidePopover();
+  removeCardsAndOneline();
+  removeCharacter();
   if (urlDebounce) clearTimeout(urlDebounce);
   urlDebounce = setTimeout(() => {
     run().catch(() => {});

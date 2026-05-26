@@ -1,6 +1,6 @@
 import type { AIProvider, AnalyzeResult } from "../provider.ts";
 import type { Env } from "../env.ts";
-import { PROMPTS } from "../prompts.ts";
+import { PROMPTS, withTimeHeader } from "../prompts.ts";
 import { matchSpans, type RawItem } from "../match-spans.ts";
 
 /**
@@ -25,7 +25,7 @@ export const geminiProvider: AIProvider = {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(args.model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const body = {
-      systemInstruction: { parts: [{ text: prompt.system }] },
+      systemInstruction: { parts: [{ text: withTimeHeader(prompt.system) }] },
       contents: [{ role: "user", parts: [{ text: args.text }] }],
       generationConfig: {
         temperature: 0.1,

@@ -11,6 +11,12 @@ nts-mark {
   display: inline;
   border-radius: 2px;
   padding: 0 1px;
+  /* 페이지 CSS 가 부모에 pointer-events:none 걸어도 우리 mark 는 클릭 가능. */
+  pointer-events: auto !important;
+  /* 페이지의 다른 element 가 위에 덮어 클릭 가로채지 못하게. */
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
 }
 nts-mark.nts-context {
   font-weight: 700;
@@ -23,17 +29,14 @@ nts-mark.nts-context {
 nts-mark.nts-sensational {
   background: rgba(255, 90, 90, 0.32);
   box-shadow: inset 0 -1px 0 rgba(220, 0, 0, 0.55);
-  cursor: pointer;
 }
 nts-mark.nts-quantitative {
   background: rgba(80, 200, 120, 0.32);
   box-shadow: inset 0 -1px 0 rgba(0, 140, 60, 0.55);
-  cursor: pointer;
 }
 nts-mark.nts-term {
   background: rgba(90, 150, 255, 0.32);
   box-shadow: inset 0 -1px 0 rgba(20, 80, 200, 0.55);
-  cursor: pointer;
 }
 /* context 안에 들어가는 다른 색은 자체 배경 + bold/밑줄 상속. */
 nts-mark.nts-context nts-mark { font-weight: inherit; }

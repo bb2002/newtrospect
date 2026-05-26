@@ -47,6 +47,7 @@ import {
   DETECT_SAMPLE_CP,
   ONELINE_PROMPT,
   REWRITE_SENSATIONAL_PROMPT,
+  withTimeHeader,
 } from "./prompts.ts";
 import { privacyHtml } from "./privacy.ts";
 
@@ -256,7 +257,7 @@ function parseHost(origin: string | null): string | null {
 async function runDetectWorkersAI(env: Env, model: string, sample: string): Promise<string> {
   const raw = await env.AI.run(model as Parameters<Ai["run"]>[0], {
     messages: [
-      { role: "system", content: DETECT_PROMPT },
+      { role: "system", content: withTimeHeader(DETECT_PROMPT) },
       { role: "user", content: sample },
     ],
     max_tokens: 96,
@@ -270,7 +271,7 @@ async function runDetectGemini(env: Env, model: string, sample: string): Promise
   if (!apiKey) throw new Error("GEMINI_API_KEY missing — wrangler secret put GEMINI_API_KEY");
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const body = {
-    systemInstruction: { parts: [{ text: DETECT_PROMPT }] },
+    systemInstruction: { parts: [{ text: withTimeHeader(DETECT_PROMPT) }] },
     contents: [{ role: "user", parts: [{ text: sample }] }],
     generationConfig: {
       temperature: 0.1,
@@ -342,7 +343,7 @@ async function handleBriefing(env: Env, req: Request): Promise<Response> {
   try {
     // briefing 은 Pro 모델로 외부 지식 추론. maxOut 은 thought+text 합산 캡이므로
     // thinkingBudget 보다 2~3배 크게. (실측: flash 가 둘 합산으로 cap 적용 — 2026-05-26)
-    const raw = await callAux(env, providerName, model, BRIEFING_PROMPT, text, 16384, 8192);
+    const raw = await callAux(env, providerName, model, withTimeHeader(BRIEFING_PROMPT), text, 16384, 8192);
     const cards = parseBriefing(raw);
     if (!cards) throw new Error("briefing_parse_failed");
     const elapsedMs = Date.now() - t0;
@@ -382,7 +383,7 @@ async function handleOneline(env: Env, req: Request): Promise<Response> {
 
   try {
     // oneline 은 flash 모델 — maxOut 은 thought+text 합산 캡이라 thinkingBudget 의 2배 이상.
-    const raw = await callAux(env, providerName, model, ONELINE_PROMPT, text, 2048, 1024);
+    const raw = await callAux(env, providerName, model, withTimeHeader(ONELINE_PROMPT), text, 2048, 1024);
     const oneLine = parseOneline(raw);
     if (!oneLine) throw new Error("oneline_parse_failed");
     const elapsedMs = Date.now() - t0;
@@ -422,7 +423,7 @@ async function handleCharacter(env: Env, req: Request): Promise<Response> {
 
   try {
     // character 는 flash 모델로 7개 카테고리 1~3 평가 — maxOut 은 합산 캡이라 충분히 크게.
-    const raw = await callAux(env, providerName, model, CHARACTER_PROMPT, text, 4096, 2048);
+    const raw = await callAux(env, providerName, model, withTimeHeader(CHARACTER_PROMPT), text, 4096, 2048);
     const signals = parseCharacter(raw);
     if (!signals) throw new Error("character_parse_failed");
     const elapsedMs = Date.now() - t0;
@@ -466,7 +467,7 @@ async function handleRewriteSensational(env: Env, req: Request): Promise<Respons
 
   try {
     // rewrite 는 flash 모델로 1문장 재작성 — maxOut 은 thought+text 합산 캡.
-    const raw = await callAux(env, providerName, model, REWRITE_SENSATIONAL_PROMPT, userPayload, 2048, 1024);
+    const raw = await callAux(env, providerName, model, withTimeHeader(REWRITE_SENSATIONAL_PROMPT), userPayload, 2048, 1024);
     const rewritten = parseRewrite(raw);
     if (!rewritten) throw new Error("rewrite_parse_failed");
     const elapsedMs = Date.now() - t0;

@@ -108,6 +108,25 @@ async function run(introspectMode = false): Promise<void> {
     }
   };
 
+  // sensational spans 개수 — character 결과 보정에 사용 (둘 사이 모순 방지).
+  let sensationalSpanCount = 0;
+  let sensationalDone = false;
+  let pendingCharacter: import("@newtrospect/core/server").CharacterResponse | null = null;
+
+  const tryRenderCharacter = (): void => {
+    if (!pendingCharacter || !sensationalDone) return;
+    // character.sensational 이 spans 0개인데 2~3 으로 부풀려진 경우 1 로 cap.
+    // 사용자 시각: 우측 패널은 "자극표현 있음"이라는데 본문에 빨강 마킹이 0개면 모순으로 보임.
+    if (sensationalSpanCount === 0 && pendingCharacter.signals.sensational > 1) {
+      pendingCharacter = {
+        ...pendingCharacter,
+        signals: { ...pendingCharacter.signals, sensational: 1 },
+      };
+    }
+    renderCharacter(pendingCharacter);
+    pendingCharacter = null;
+  };
+
   const spanTasks = enabledKinds.map(async (kind) => {
     try {
       const res = await client.analyze(kind, cleanedText);
@@ -115,8 +134,17 @@ async function run(introspectMode = false): Promise<void> {
       // 워커가 반환한 spans 는 cleanedText 좌표계 → root.textContent 좌표계로 재매핑.
       const relocated = relocateSpansToRoot(res.spans as Span[], cleanedText, root);
       applyHighlights(root, relocated);
+      if (kind === "sensational") {
+        sensationalSpanCount = (res.spans as Span[]).length;
+        sensationalDone = true;
+        tryRenderCharacter();
+      }
       tick(false);
     } catch {
+      if (kind === "sensational") {
+        sensationalDone = true;
+        tryRenderCharacter();
+      }
       tick(true);
     }
   });
@@ -143,12 +171,20 @@ async function run(introspectMode = false): Promise<void> {
     .character(cleanedText)
     .then((c) => {
       if (ac.signal.aborted) return;
-      renderCharacter(c);
+      // sensational spans 가 도착했는지 보고 일관성 보정 후 렌더.
+      pendingCharacter = c;
+      tryRenderCharacter();
       tick(false);
     })
     .catch(() => tick(true));
 
   await Promise.allSettled([...spanTasks, briefingTask, onelineTask, characterTask]);
+
+  // 안전망: character 가 sensational 대기 중에 렌더 안 됐다면 (sensational 실패 등) 강제 렌더.
+  if (pendingCharacter) {
+    sensationalDone = true;
+    tryRenderCharacter();
+  }
 
   if (ac.signal.aborted) return;
   if (errors === total) {

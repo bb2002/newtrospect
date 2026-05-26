@@ -1,11 +1,8 @@
 /**
  * specs/01 — 본문 root 위쪽에 3장 카드 (briefing), 아래쪽에 한 줄 정리 (oneline).
+ * extension content/cards.ts 미러 (모바일도 동일 UX).
  *
  * 7개 병렬 아키텍처: briefing 과 oneline 은 *각자 별도 AI 호출* — 도착하는 대로 렌더.
- * 한 쪽이 늦거나 실패해도 다른 쪽은 즉시 노출된다.
- *
- * 위치: root 의 *바깥 형제*로 삽입 (insertAdjacentElement) — 본문 레이아웃을 깨지 않고
- *       위/아래에 자연스럽게 붙는다.
  */
 import type {
   BriefingResponse,
@@ -24,7 +21,7 @@ export function renderCards(root: Element, briefing: BriefingResponse): void {
   top.id = CARDS_ID;
   top.innerHTML = `
     <div class="nts-cards-head">
-      <span class="nts-cards-eyebrow">읽기 전에 3가지</span>
+      <span class="nts-cards-eyebrow">읽기 전 3가지</span>
       <span class="nts-cards-hint">기사를 읽기 전 확인하면 좋은 내용이에요 :)</span>
     </div>
     <div class="nts-cards-grid">
@@ -74,7 +71,7 @@ function ensureStyles(): void {
       background: linear-gradient(180deg, rgba(245,247,252,0.92) 0%, rgba(238,242,250,0.92) 100%);
       border: 1px solid rgba(80, 110, 200, 0.18);
       border-radius: 10px;
-      font: 13px/1.5 system-ui, -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+      font: 14px/1.5 system-ui, -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif;
       color: #1c2230;
     }
     #${CARDS_ID} .nts-cards-head {
@@ -107,11 +104,11 @@ function ensureStyles(): void {
     }
     #${CARDS_ID} .nts-card-title {
       margin: 0 22px 6px 0;
-      font-size: 13px; font-weight: 700; color: #1c2538; line-height: 1.4;
+      font-size: 14px; font-weight: 700; color: #1c2538; line-height: 1.4;
     }
     #${CARDS_ID} .nts-card-body {
       margin: 0;
-      font-size: 12.5px; color: #3b4258; line-height: 1.55;
+      font-size: 13.5px; color: #3b4258; line-height: 1.55;
       word-break: keep-all;
     }
     #${ONELINE_ID} {
@@ -121,7 +118,7 @@ function ensureStyles(): void {
       background: rgba(255, 244, 220, 0.78);
       border-left: 4px solid #f0b400;
       border-radius: 4px;
-      font: 14px/1.55 system-ui, -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+      font: 15px/1.55 system-ui, -apple-system, "Pretendard", "Apple SD Gothic Neo", sans-serif;
       color: #2a2418;
       display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
     }
@@ -133,7 +130,7 @@ function ensureStyles(): void {
     #${ONELINE_ID} .nts-oneline-body {
       flex: 1 1 auto;
       margin: 0;
-      font-size: 14.5px; font-weight: 500; color: #2a2418; word-break: keep-all;
+      font-size: 15px; font-weight: 500; color: #2a2418; word-break: keep-all;
     }
   `;
   document.head.appendChild(style);
