@@ -1,17 +1,19 @@
 import type {
   AnalysisKind,
   AnalyzeResponse,
+  BriefingResponse,
   CharacterResponse,
   DetectArticleResponse,
+  OneLineResponse,
   RewriteSensationalResponse,
   Span,
-  SummaryResponse,
 } from "./types.ts";
 import {
   ANALYZE_ENDPOINTS,
+  BRIEFING_ENDPOINT,
   CHARACTER_ENDPOINT,
+  ONELINE_ENDPOINT,
   REWRITE_SENSATIONAL_ENDPOINT,
-  SUMMARY_ENDPOINT,
 } from "./types.ts";
 
 export interface ClientOptions {
@@ -48,9 +50,14 @@ export class NewtrospectClient {
     return map;
   }
 
-  /** 한줄정리 + 3장 카드 (specs/01). */
-  async summary(text: string): Promise<SummaryResponse> {
-    return this.post<SummaryResponse>(SUMMARY_ENDPOINT, { text, lang: "ko" });
+  /** 본문 상단 3장 맥락 카드 (specs/01). */
+  async briefing(text: string): Promise<BriefingResponse> {
+    return this.post<BriefingResponse>(BRIEFING_ENDPOINT, { text, lang: "ko" });
+  }
+
+  /** 본문 하단 한 줄 요약 (specs/01). */
+  async oneline(text: string): Promise<OneLineResponse> {
+    return this.post<OneLineResponse>(ONELINE_ENDPOINT, { text, lang: "ko" });
   }
 
   /** 글 성격 7신호 (specs/04). */

@@ -3,16 +3,31 @@ import type {
   AnalysisKind,
   AnalyzeResponse,
   BriefingCard,
+  BriefingResponse,
   CharacterLevel,
   CharacterResponse,
   CharacterSignalKey,
   DetectArticleResponse,
+  OneLineResponse,
   RewriteSensationalResponse,
-  SummaryResponse,
 } from "@newtrospect/core/server";
 import { CHARACTER_SIGNAL_ORDER, MIN_BODY_LENGTH, sha256Hex } from "@newtrospect/core/server";
 import type { Env } from "./env.ts";
-import { auxModel, auxProvider, cacheTtlSec, detectModel, detectProvider, modelFor, providerFor } from "./env.ts";
+import {
+  briefingModel,
+  briefingProvider,
+  cacheTtlSec,
+  characterModel,
+  characterProvider,
+  detectModel,
+  detectProvider,
+  modelFor,
+  onelineModel,
+  onelineProvider,
+  providerFor,
+  rewriteModel,
+  rewriteProvider,
+} from "./env.ts";
 import {
   logRequest,
   readCache,
@@ -26,11 +41,12 @@ import { workersAIProvider, extractText } from "./providers/workers-ai.ts";
 import { geminiProvider } from "./providers/gemini.ts";
 import type { AIProvider } from "./provider.ts";
 import {
+  BRIEFING_PROMPT,
   CHARACTER_PROMPT,
   DETECT_PROMPT,
   DETECT_SAMPLE_CP,
+  ONELINE_PROMPT,
   REWRITE_SENSATIONAL_PROMPT,
-  SUMMARY_PROMPT,
 } from "./prompts.ts";
 import { privacyHtml } from "./privacy.ts";
 
@@ -85,7 +101,10 @@ app.get("/health", (c) => {
       quantitative: modelFor(env, "quantitative"),
       context: modelFor(env, "context"),
       detect: detectModel(env),
-      aux: auxModel(env),
+      briefing: briefingModel(env),
+      oneline: onelineModel(env),
+      character: characterModel(env),
+      rewrite: rewriteModel(env),
     },
     cacheTtlSec: cacheTtlSec(env),
   });
@@ -106,8 +125,10 @@ for (const kind of KINDS) {
   app.post(`/api/analyze/${kind === "term" ? "terms" : kind}`, (c) => handleAnalyze(c.env, c.req.raw, kind));
 }
 
-// specs/01 — 본문 위쪽 3장 카드 + 본문 아래 한 줄 정리.
-app.post("/api/analyze/summary", (c) => handleSummary(c.env, c.req.raw));
+// specs/01 — 본문 위쪽 3장 카드 (외부 맥락, Pro 모델).
+app.post("/api/analyze/briefing", (c) => handleBriefing(c.env, c.req.raw));
+// specs/01 — 본문 아래 한 줄 요약 (본문 압축, flash 모델).
+app.post("/api/analyze/oneline", (c) => handleOneline(c.env, c.req.raw));
 // specs/04 — 글 성격 7신호.
 app.post("/api/analyze/character", (c) => handleCharacter(c.env, c.req.raw));
 // specs/03 — 자극적 문장 1개를 온화한 표현으로 변환.
@@ -296,42 +317,84 @@ function parseDetect(raw: string): { isArticle: boolean; reason?: string } {
   }
 }
 
-/* ── specs/01 한줄정리 + 카드뉴스 ─────────────────────────────────────────── */
+/* ── specs/01 카드 3장 (briefing) ─────────────────────────────────────────── */
 
-async function handleSummary(env: Env, req: Request): Promise<Response> {
+async function handleBriefing(env: Env, req: Request): Promise<Response> {
   const host = parseHost(req.headers.get("origin"));
   const body = (await req.json().catch(() => ({}))) as { text?: string };
   const text = (body.text ?? "").trim();
   if (text.length < MIN_BODY_LENGTH) {
-    await logRequest(env, { host, kind: "summary", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
+    await logRequest(env, { host, kind: "briefing", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
     return Response.json({ error: "text too short" }, { status: 400 });
   }
 
   const bodyHash = await sha256Hex(text);
-  const cached = await readGenericCache<SummaryResponse>(env, bodyHash, "summary");
+  const cached = await readGenericCache<BriefingResponse>(env, bodyHash, "briefing");
   if (cached) {
-    await logRequest(env, { host, kind: "summary", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
+    await logRequest(env, { host, kind: "briefing", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
     return Response.json({ ...cached, cached: true });
   }
 
-  const providerName = auxProvider(env);
-  const model = auxModel(env);
+  const providerName = briefingProvider(env);
+  const model = briefingModel(env);
   const t0 = Date.now();
 
   try {
-    const raw = await callAux(env, providerName, model, SUMMARY_PROMPT, text, 1024);
-    const parsed = parseSummary(raw);
-    if (!parsed) throw new Error("summary_parse_failed");
+    // briefing 은 Pro 모델로 외부 지식 추론. maxOut 은 thought+text 합산 캡이므로
+    // thinkingBudget 보다 2~3배 크게. (실측: flash 가 둘 합산으로 cap 적용 — 2026-05-26)
+    const raw = await callAux(env, providerName, model, BRIEFING_PROMPT, text, 16384, 8192);
+    const cards = parseBriefing(raw);
+    if (!cards) throw new Error("briefing_parse_failed");
     const elapsedMs = Date.now() - t0;
-    const response: SummaryResponse = { ...parsed, model, elapsedMs };
-    await writeGenericCache(env, bodyHash, "summary", model, response, cacheTtlSec(env));
-    await logRequest(env, { host, kind: "summary", model, elapsedMs, statusCode: 200, cacheHit: false });
+    const response: BriefingResponse = { cards, model, elapsedMs };
+    await writeGenericCache(env, bodyHash, "briefing", model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "briefing", model, elapsedMs, statusCode: 200, cacheHit: false });
     return Response.json(response);
   } catch (err) {
     const rawMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[summary] model=${model} host=${host ?? "?"} err=${rawMsg}`);
-    await logRequest(env, { host, kind: "summary", model, elapsedMs: null, statusCode: 500, cacheHit: false });
-    return Response.json({ error: "summary_failed" }, { status: 500 });
+    console.error(`[briefing] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "briefing", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "briefing_failed" }, { status: 500 });
+  }
+}
+
+/* ── specs/01 한 줄 요약 (oneline) ──────────────────────────────────────── */
+
+async function handleOneline(env: Env, req: Request): Promise<Response> {
+  const host = parseHost(req.headers.get("origin"));
+  const body = (await req.json().catch(() => ({}))) as { text?: string };
+  const text = (body.text ?? "").trim();
+  if (text.length < MIN_BODY_LENGTH) {
+    await logRequest(env, { host, kind: "oneline", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
+    return Response.json({ error: "text too short" }, { status: 400 });
+  }
+
+  const bodyHash = await sha256Hex(text);
+  const cached = await readGenericCache<OneLineResponse>(env, bodyHash, "oneline");
+  if (cached) {
+    await logRequest(env, { host, kind: "oneline", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
+    return Response.json({ ...cached, cached: true });
+  }
+
+  const providerName = onelineProvider(env);
+  const model = onelineModel(env);
+  const t0 = Date.now();
+
+  try {
+    // oneline 은 flash 모델 — maxOut 은 thought+text 합산 캡이라 thinkingBudget 의 2배 이상.
+    const raw = await callAux(env, providerName, model, ONELINE_PROMPT, text, 2048, 1024);
+    const oneLine = parseOneline(raw);
+    if (!oneLine) throw new Error("oneline_parse_failed");
+    const elapsedMs = Date.now() - t0;
+    const response: OneLineResponse = { oneLine, model, elapsedMs };
+    await writeGenericCache(env, bodyHash, "oneline", model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "oneline", model, elapsedMs, statusCode: 200, cacheHit: false });
+    return Response.json(response);
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[oneline] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "oneline", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "oneline_failed" }, { status: 500 });
   }
 }
 
@@ -353,12 +416,13 @@ async function handleCharacter(env: Env, req: Request): Promise<Response> {
     return Response.json({ ...cached, cached: true });
   }
 
-  const providerName = auxProvider(env);
-  const model = auxModel(env);
+  const providerName = characterProvider(env);
+  const model = characterModel(env);
   const t0 = Date.now();
 
   try {
-    const raw = await callAux(env, providerName, model, CHARACTER_PROMPT, text, 256);
+    // character 는 flash 모델로 7개 카테고리 1~3 평가 — maxOut 은 합산 캡이라 충분히 크게.
+    const raw = await callAux(env, providerName, model, CHARACTER_PROMPT, text, 4096, 2048);
     const signals = parseCharacter(raw);
     if (!signals) throw new Error("character_parse_failed");
     const elapsedMs = Date.now() - t0;
@@ -395,13 +459,14 @@ async function handleRewriteSensational(env: Env, req: Request): Promise<Respons
     return Response.json({ ...cached, cached: true });
   }
 
-  const providerName = auxProvider(env);
-  const model = auxModel(env);
+  const providerName = rewriteProvider(env);
+  const model = rewriteModel(env);
   const t0 = Date.now();
   const userPayload = reason ? `<문장>${text}</문장>\n<이유>${reason}</이유>` : text;
 
   try {
-    const raw = await callAux(env, providerName, model, REWRITE_SENSATIONAL_PROMPT, userPayload, 320);
+    // rewrite 는 flash 모델로 1문장 재작성 — maxOut 은 thought+text 합산 캡.
+    const raw = await callAux(env, providerName, model, REWRITE_SENSATIONAL_PROMPT, userPayload, 2048, 1024);
     const rewritten = parseRewrite(raw);
     if (!rewritten) throw new Error("rewrite_parse_failed");
     const elapsedMs = Date.now() - t0;
@@ -422,6 +487,9 @@ async function handleRewriteSensational(env: Env, req: Request): Promise<Respons
 /**
  * span 반환이 아닌 *임의 JSON 문자열* 을 받아오는 보조 호출.
  * detect-article 의 Gemini/WorkersAI 분기를 일반화한 것.
+ *
+ * thinkingBudget: Gemini 3.x thinking mode 의 thought 토큰 한도. 별도로 명시 안 하면
+ * thought 가 maxOutputTokens 를 다 먹고 text 응답이 잘림. 기본값은 호출별 권장값.
  */
 async function callAux(
   env: Env,
@@ -430,9 +498,10 @@ async function callAux(
   systemPrompt: string,
   userText: string,
   maxOutputTokens: number,
+  thinkingBudget?: number,
 ): Promise<string> {
   if (providerName === "gemini") {
-    return runGenericGemini(env, model, systemPrompt, userText, maxOutputTokens);
+    return runGenericGemini(env, model, systemPrompt, userText, maxOutputTokens, thinkingBudget);
   }
   if (providerName === "workers-ai") {
     return runGenericWorkersAI(env, model, systemPrompt, userText, maxOutputTokens);
@@ -446,6 +515,7 @@ async function runGenericGemini(
   systemPrompt: string,
   userText: string,
   maxOutputTokens: number,
+  thinkingBudget?: number,
 ): Promise<string> {
   const apiKey = env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY missing — wrangler secret put GEMINI_API_KEY");
@@ -457,6 +527,11 @@ async function runGenericGemini(
       temperature: 0.1,
       response_mime_type: "application/json",
       maxOutputTokens,
+      // 호출별 명시 안 한 경우 maxOutputTokens 의 절반을 thought 에 할당 (안전 디폴트).
+      thinkingConfig: {
+        thinkingBudget: thinkingBudget ?? Math.max(512, Math.floor(maxOutputTokens / 2)),
+        includeThoughts: false,
+      },
     },
   };
   const res = await fetch(url, {
@@ -506,12 +581,9 @@ function extractJsonObject(raw: string): unknown | null {
   }
 }
 
-function parseSummary(raw: string): { cards: BriefingCard[]; oneLine: string } | null {
-  const obj = extractJsonObject(raw) as
-    | { cards?: unknown; oneLine?: unknown }
-    | null;
-  if (!obj) return null;
-  if (!Array.isArray(obj.cards)) return null;
+function parseBriefing(raw: string): BriefingCard[] | null {
+  const obj = extractJsonObject(raw) as { cards?: unknown } | null;
+  if (!obj || !Array.isArray(obj.cards)) return null;
   const cards: BriefingCard[] = [];
   for (const c of obj.cards) {
     if (typeof c !== "object" || c === null) continue;
@@ -521,10 +593,14 @@ function parseSummary(raw: string): { cards: BriefingCard[]; oneLine: string } |
     cards.push({ title, body });
     if (cards.length === 3) break;
   }
-  if (cards.length === 0) return null;
-  const oneLine = typeof obj.oneLine === "string" ? obj.oneLine.trim() : "";
-  if (!oneLine) return null;
-  return { cards, oneLine };
+  return cards.length > 0 ? cards : null;
+}
+
+function parseOneline(raw: string): string | null {
+  const obj = extractJsonObject(raw) as { oneLine?: unknown } | null;
+  if (!obj || typeof obj.oneLine !== "string") return null;
+  const trimmed = obj.oneLine.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function parseCharacter(raw: string): Record<CharacterSignalKey, CharacterLevel> | null {

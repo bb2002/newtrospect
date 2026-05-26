@@ -1,19 +1,21 @@
 /**
- * specs/01 — 본문 root 의 *위쪽*에 3장 카드, *아래쪽*에 한 줄 정리를 렌더.
+ * specs/01 — 본문 root 위쪽에 3장 카드 (briefing), 아래쪽에 한 줄 정리 (oneline).
+ *
+ * 7개 병렬 아키텍처: briefing 과 oneline 은 *각자 별도 AI 호출* — 도착하는 대로 렌더.
+ * 한 쪽이 늦거나 실패해도 다른 쪽은 즉시 노출된다.
  *
  * 위치: root 의 *바깥 형제*로 삽입 (insertAdjacentElement) — 본문 레이아웃을 깨지 않고
- *       위/아래에 자연스럽게 붙는다. root.prepend/append 는 사이트별 article CSS 와
- *       충돌하기 쉬워 비추.
+ *       위/아래에 자연스럽게 붙는다.
  */
-import type { SummaryResponse } from "@newtrospect/core/server";
+import type { BriefingResponse, OneLineResponse } from "@newtrospect/core/server";
 
 const CARDS_ID = "nts-cards";
 const ONELINE_ID = "nts-oneline";
 const STYLE_ID = "nts-summary-styles";
 
-export function renderSummary(root: Element, summary: SummaryResponse): void {
+export function renderCards(root: Element, briefing: BriefingResponse): void {
   ensureStyles();
-  removeSummary();
+  document.getElementById(CARDS_ID)?.remove();
 
   const top = document.createElement("section");
   top.id = CARDS_ID;
@@ -23,21 +25,26 @@ export function renderSummary(root: Element, summary: SummaryResponse): void {
       <span class="nts-cards-hint">기사 이해를 돕는 배경 3가지</span>
     </div>
     <div class="nts-cards-grid">
-      ${summary.cards.map(renderCard).join("")}
+      ${briefing.cards.map(renderCard).join("")}
     </div>
   `;
   root.insertAdjacentElement("beforebegin", top);
+}
+
+export function renderOneline(root: Element, ol: OneLineResponse): void {
+  ensureStyles();
+  document.getElementById(ONELINE_ID)?.remove();
 
   const bottom = document.createElement("section");
   bottom.id = ONELINE_ID;
   bottom.innerHTML = `
     <span class="nts-oneline-label">이 기사 한 줄</span>
-    <p class="nts-oneline-body">${escapeHtml(summary.oneLine)}</p>
+    <p class="nts-oneline-body">${escapeHtml(ol.oneLine)}</p>
   `;
   root.insertAdjacentElement("afterend", bottom);
 }
 
-export function removeSummary(): void {
+export function removeCardsAndOneline(): void {
   document.getElementById(CARDS_ID)?.remove();
   document.getElementById(ONELINE_ID)?.remove();
 }

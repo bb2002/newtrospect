@@ -138,7 +138,7 @@ export async function logRequest(
   env: Env,
   fields: {
     host: string | null;
-    kind: AnalysisKind | "detect" | "summary" | "character" | "rewrite_sens";
+    kind: AnalysisKind | "detect" | "briefing" | "oneline" | "character" | "rewrite_sens";
     model: string | null;
     elapsedMs: number | null;
     statusCode: number;
