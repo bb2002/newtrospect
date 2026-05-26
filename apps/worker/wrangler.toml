@@ -28,12 +28,15 @@ PROVIDER_SENSATIONAL = "gemini"
 PROVIDER_QUANTITATIVE = "gemini"
 PROVIDER_CONTEXT = "gemini"
 PROVIDER_DETECT = "gemini"
+# specs/01·03·04 (summary / character / rewrite-sensational) 공통.
+PROVIDER_AUX = "gemini"
 
-MODEL_TERM = "gemini-3.1-flash-lite-preview"
-MODEL_SENSATIONAL = "gemini-3.1-flash-lite-preview"
-MODEL_QUANTITATIVE = "gemini-3.1-flash-lite-preview"
-MODEL_CONTEXT = "gemini-3.1-flash-lite-preview"
-MODEL_DETECT = "gemini-3.1-flash-lite-preview"
+MODEL_TERM = "gemini-flash-lite-latest"
+MODEL_SENSATIONAL = "gemini-flash-lite-latest"
+MODEL_QUANTITATIVE = "gemini-flash-lite-latest"
+MODEL_CONTEXT = "gemini-flash-lite-latest"
+MODEL_DETECT = "gemini-flash-lite-latest"
+MODEL_AUX = "gemini-flash-lite-latest"
 
 # 캐시 TTL (초). 1시간.
 CACHE_TTL_SEC = "3600"

@@ -1,10 +1,18 @@
 import type {
   AnalysisKind,
   AnalyzeResponse,
+  CharacterResponse,
   DetectArticleResponse,
+  RewriteSensationalResponse,
   Span,
+  SummaryResponse,
 } from "./types.ts";
-import { ANALYZE_ENDPOINTS } from "./types.ts";
+import {
+  ANALYZE_ENDPOINTS,
+  CHARACTER_ENDPOINT,
+  REWRITE_SENSATIONAL_ENDPOINT,
+  SUMMARY_ENDPOINT,
+} from "./types.ts";
 
 export interface ClientOptions {
   baseUrl: string;
@@ -38,6 +46,21 @@ export class NewtrospectClient {
       map[k] = results[i]!;
     });
     return map;
+  }
+
+  /** 한줄정리 + 3장 카드 (specs/01). */
+  async summary(text: string): Promise<SummaryResponse> {
+    return this.post<SummaryResponse>(SUMMARY_ENDPOINT, { text, lang: "ko" });
+  }
+
+  /** 글 성격 7신호 (specs/04). */
+  async character(text: string): Promise<CharacterResponse> {
+    return this.post<CharacterResponse>(CHARACTER_ENDPOINT, { text, lang: "ko" });
+  }
+
+  /** 자극적 문장을 온화한 표현으로 변환 (specs/03). */
+  async rewriteSensational(text: string, reason?: string): Promise<RewriteSensationalResponse> {
+    return this.post<RewriteSensationalResponse>(REWRITE_SENSATIONAL_ENDPOINT, { text, reason });
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {

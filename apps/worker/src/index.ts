@@ -1,13 +1,37 @@
 import { Hono } from "hono";
-import type { AnalysisKind, AnalyzeResponse, DetectArticleResponse } from "@newtrospect/core/server";
-import { MIN_BODY_LENGTH, sha256Hex } from "@newtrospect/core/server";
+import type {
+  AnalysisKind,
+  AnalyzeResponse,
+  BriefingCard,
+  CharacterLevel,
+  CharacterResponse,
+  CharacterSignalKey,
+  DetectArticleResponse,
+  RewriteSensationalResponse,
+  SummaryResponse,
+} from "@newtrospect/core/server";
+import { CHARACTER_SIGNAL_ORDER, MIN_BODY_LENGTH, sha256Hex } from "@newtrospect/core/server";
 import type { Env } from "./env.ts";
-import { cacheTtlSec, detectModel, detectProvider, modelFor, providerFor } from "./env.ts";
-import { logRequest, readCache, readDetectCache, writeCache, writeDetectCache } from "./cache.ts";
+import { auxModel, auxProvider, cacheTtlSec, detectModel, detectProvider, modelFor, providerFor } from "./env.ts";
+import {
+  logRequest,
+  readCache,
+  readDetectCache,
+  readGenericCache,
+  writeCache,
+  writeDetectCache,
+  writeGenericCache,
+} from "./cache.ts";
 import { workersAIProvider, extractText } from "./providers/workers-ai.ts";
 import { geminiProvider } from "./providers/gemini.ts";
 import type { AIProvider } from "./provider.ts";
-import { DETECT_PROMPT, DETECT_SAMPLE_CP } from "./prompts.ts";
+import {
+  CHARACTER_PROMPT,
+  DETECT_PROMPT,
+  DETECT_SAMPLE_CP,
+  REWRITE_SENSATIONAL_PROMPT,
+  SUMMARY_PROMPT,
+} from "./prompts.ts";
 import { privacyHtml } from "./privacy.ts";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -61,6 +85,7 @@ app.get("/health", (c) => {
       quantitative: modelFor(env, "quantitative"),
       context: modelFor(env, "context"),
       detect: detectModel(env),
+      aux: auxModel(env),
     },
     cacheTtlSec: cacheTtlSec(env),
   });
@@ -80,6 +105,13 @@ const KINDS: readonly AnalysisKind[] = ["term", "sensational", "quantitative", "
 for (const kind of KINDS) {
   app.post(`/api/analyze/${kind === "term" ? "terms" : kind}`, (c) => handleAnalyze(c.env, c.req.raw, kind));
 }
+
+// specs/01 — 본문 위쪽 3장 카드 + 본문 아래 한 줄 정리.
+app.post("/api/analyze/summary", (c) => handleSummary(c.env, c.req.raw));
+// specs/04 — 글 성격 7신호.
+app.post("/api/analyze/character", (c) => handleCharacter(c.env, c.req.raw));
+// specs/03 — 자극적 문장 1개를 온화한 표현으로 변환.
+app.post("/api/rewrite/sensational", (c) => handleRewriteSensational(c.env, c.req.raw));
 
 async function handleDetect(env: Env, req: Request): Promise<Response> {
   const reqOrigin = req.headers.get("origin");
@@ -262,6 +294,258 @@ function parseDetect(raw: string): { isArticle: boolean; reason?: string } {
   } catch {
     return { isArticle: true, reason: "ai_unparseable_pass" };
   }
+}
+
+/* ── specs/01 한줄정리 + 카드뉴스 ─────────────────────────────────────────── */
+
+async function handleSummary(env: Env, req: Request): Promise<Response> {
+  const host = parseHost(req.headers.get("origin"));
+  const body = (await req.json().catch(() => ({}))) as { text?: string };
+  const text = (body.text ?? "").trim();
+  if (text.length < MIN_BODY_LENGTH) {
+    await logRequest(env, { host, kind: "summary", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
+    return Response.json({ error: "text too short" }, { status: 400 });
+  }
+
+  const bodyHash = await sha256Hex(text);
+  const cached = await readGenericCache<SummaryResponse>(env, bodyHash, "summary");
+  if (cached) {
+    await logRequest(env, { host, kind: "summary", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
+    return Response.json({ ...cached, cached: true });
+  }
+
+  const providerName = auxProvider(env);
+  const model = auxModel(env);
+  const t0 = Date.now();
+
+  try {
+    const raw = await callAux(env, providerName, model, SUMMARY_PROMPT, text, 1024);
+    const parsed = parseSummary(raw);
+    if (!parsed) throw new Error("summary_parse_failed");
+    const elapsedMs = Date.now() - t0;
+    const response: SummaryResponse = { ...parsed, model, elapsedMs };
+    await writeGenericCache(env, bodyHash, "summary", model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "summary", model, elapsedMs, statusCode: 200, cacheHit: false });
+    return Response.json(response);
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[summary] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "summary", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "summary_failed" }, { status: 500 });
+  }
+}
+
+/* ── specs/04 글 성격 7신호 ──────────────────────────────────────────────── */
+
+async function handleCharacter(env: Env, req: Request): Promise<Response> {
+  const host = parseHost(req.headers.get("origin"));
+  const body = (await req.json().catch(() => ({}))) as { text?: string };
+  const text = (body.text ?? "").trim();
+  if (text.length < MIN_BODY_LENGTH) {
+    await logRequest(env, { host, kind: "character", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
+    return Response.json({ error: "text too short" }, { status: 400 });
+  }
+
+  const bodyHash = await sha256Hex(text);
+  const cached = await readGenericCache<CharacterResponse>(env, bodyHash, "character");
+  if (cached) {
+    await logRequest(env, { host, kind: "character", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
+    return Response.json({ ...cached, cached: true });
+  }
+
+  const providerName = auxProvider(env);
+  const model = auxModel(env);
+  const t0 = Date.now();
+
+  try {
+    const raw = await callAux(env, providerName, model, CHARACTER_PROMPT, text, 256);
+    const signals = parseCharacter(raw);
+    if (!signals) throw new Error("character_parse_failed");
+    const elapsedMs = Date.now() - t0;
+    const response: CharacterResponse = { signals, model, elapsedMs };
+    await writeGenericCache(env, bodyHash, "character", model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "character", model, elapsedMs, statusCode: 200, cacheHit: false });
+    return Response.json(response);
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[character] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "character", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "character_failed" }, { status: 500 });
+  }
+}
+
+/* ── specs/03 자극적 → 온화 변환 ─────────────────────────────────────────── */
+
+async function handleRewriteSensational(env: Env, req: Request): Promise<Response> {
+  const host = parseHost(req.headers.get("origin"));
+  const body = (await req.json().catch(() => ({}))) as { text?: string; reason?: string };
+  const text = (body.text ?? "").trim();
+  if (text.length < 4) {
+    // 자극 문장 1개라 짧을 수 있음. 4자 미만이면 입력 오류로 간주.
+    await logRequest(env, { host, kind: "rewrite_sens", model: null, elapsedMs: null, statusCode: 400, cacheHit: false });
+    return Response.json({ error: "text too short" }, { status: 400 });
+  }
+  const reason = typeof body.reason === "string" ? body.reason : undefined;
+
+  // 캐시 키: text + reason 함께 해시 (reason 이 변환 결과를 가르는 단서가 됨)
+  const cacheKey = await sha256Hex(reason ? `${text}\n${reason}` : text);
+  const cached = await readGenericCache<RewriteSensationalResponse>(env, cacheKey, "rewrite_sens");
+  if (cached) {
+    await logRequest(env, { host, kind: "rewrite_sens", model: cached.model, elapsedMs: cached.elapsedMs, statusCode: 200, cacheHit: true });
+    return Response.json({ ...cached, cached: true });
+  }
+
+  const providerName = auxProvider(env);
+  const model = auxModel(env);
+  const t0 = Date.now();
+  const userPayload = reason ? `<문장>${text}</문장>\n<이유>${reason}</이유>` : text;
+
+  try {
+    const raw = await callAux(env, providerName, model, REWRITE_SENSATIONAL_PROMPT, userPayload, 320);
+    const rewritten = parseRewrite(raw);
+    if (!rewritten) throw new Error("rewrite_parse_failed");
+    const elapsedMs = Date.now() - t0;
+    const response: RewriteSensationalResponse = { rewritten, model, elapsedMs };
+    await writeGenericCache(env, cacheKey, "rewrite_sens", model, response, cacheTtlSec(env));
+    await logRequest(env, { host, kind: "rewrite_sens", model, elapsedMs, statusCode: 200, cacheHit: false });
+    return Response.json(response);
+  } catch (err) {
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[rewrite_sens] model=${model} host=${host ?? "?"} err=${rawMsg}`);
+    await logRequest(env, { host, kind: "rewrite_sens", model, elapsedMs: null, statusCode: 500, cacheHit: false });
+    return Response.json({ error: "rewrite_failed" }, { status: 500 });
+  }
+}
+
+/* ── 보조 분석 공통 호출 헬퍼 ─────────────────────────────────────────────── */
+
+/**
+ * span 반환이 아닌 *임의 JSON 문자열* 을 받아오는 보조 호출.
+ * detect-article 의 Gemini/WorkersAI 분기를 일반화한 것.
+ */
+async function callAux(
+  env: Env,
+  providerName: string,
+  model: string,
+  systemPrompt: string,
+  userText: string,
+  maxOutputTokens: number,
+): Promise<string> {
+  if (providerName === "gemini") {
+    return runGenericGemini(env, model, systemPrompt, userText, maxOutputTokens);
+  }
+  if (providerName === "workers-ai") {
+    return runGenericWorkersAI(env, model, systemPrompt, userText, maxOutputTokens);
+  }
+  throw new Error(`provider_not_supported:${providerName}`);
+}
+
+async function runGenericGemini(
+  env: Env,
+  model: string,
+  systemPrompt: string,
+  userText: string,
+  maxOutputTokens: number,
+): Promise<string> {
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY missing — wrangler secret put GEMINI_API_KEY");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: "user", parts: [{ text: userText }] }],
+    generationConfig: {
+      temperature: 0.1,
+      response_mime_type: "application/json",
+      maxOutputTokens,
+    },
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`gemini ${res.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+}
+
+async function runGenericWorkersAI(
+  env: Env,
+  model: string,
+  systemPrompt: string,
+  userText: string,
+  maxOutputTokens: number,
+): Promise<string> {
+  const raw = await env.AI.run(model as Parameters<Ai["run"]>[0], {
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userText },
+    ],
+    max_tokens: maxOutputTokens,
+    temperature: 0.1,
+  });
+  return extractText(raw);
+}
+
+/* ── JSON 파서 ─────────────────────────────────────────────────────────── */
+
+function extractJsonObject(raw: string): unknown | null {
+  if (!raw) return null;
+  const first = raw.indexOf("{");
+  const last = raw.lastIndexOf("}");
+  if (first < 0 || last <= first) return null;
+  try {
+    return JSON.parse(raw.slice(first, last + 1));
+  } catch {
+    return null;
+  }
+}
+
+function parseSummary(raw: string): { cards: BriefingCard[]; oneLine: string } | null {
+  const obj = extractJsonObject(raw) as
+    | { cards?: unknown; oneLine?: unknown }
+    | null;
+  if (!obj) return null;
+  if (!Array.isArray(obj.cards)) return null;
+  const cards: BriefingCard[] = [];
+  for (const c of obj.cards) {
+    if (typeof c !== "object" || c === null) continue;
+    const title = typeof (c as BriefingCard).title === "string" ? (c as BriefingCard).title.trim() : "";
+    const body = typeof (c as BriefingCard).body === "string" ? (c as BriefingCard).body.trim() : "";
+    if (!title || !body) continue;
+    cards.push({ title, body });
+    if (cards.length === 3) break;
+  }
+  if (cards.length === 0) return null;
+  const oneLine = typeof obj.oneLine === "string" ? obj.oneLine.trim() : "";
+  if (!oneLine) return null;
+  return { cards, oneLine };
+}
+
+function parseCharacter(raw: string): Record<CharacterSignalKey, CharacterLevel> | null {
+  const obj = extractJsonObject(raw) as { signals?: Record<string, unknown> } | null;
+  if (!obj || typeof obj.signals !== "object" || obj.signals === null) return null;
+  const signals = obj.signals;
+  const out = {} as Record<CharacterSignalKey, CharacterLevel>;
+  for (const key of CHARACTER_SIGNAL_ORDER) {
+    const v = signals[key];
+    const num = typeof v === "number" ? v : Number(v);
+    if (num !== 1 && num !== 2 && num !== 3) return null;
+    out[key] = num as CharacterLevel;
+  }
+  return out;
+}
+
+function parseRewrite(raw: string): string | null {
+  const obj = extractJsonObject(raw) as { rewritten?: unknown } | null;
+  if (!obj || typeof obj.rewritten !== "string") return null;
+  const trimmed = obj.rewritten.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export default app;

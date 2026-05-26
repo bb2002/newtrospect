@@ -9,12 +9,15 @@ export interface Env {
   PROVIDER_QUANTITATIVE: string;
   PROVIDER_CONTEXT: string;
   PROVIDER_DETECT: string;
+  /** summary / character / rewrite 등 보조 분석에 공통 사용. */
+  PROVIDER_AUX: string;
 
   MODEL_TERM: string;
   MODEL_SENSATIONAL: string;
   MODEL_QUANTITATIVE: string;
   MODEL_CONTEXT: string;
   MODEL_DETECT: string;
+  MODEL_AUX: string;
 
   CACHE_TTL_SEC: string;
 
@@ -50,6 +53,14 @@ export function detectProvider(env: Env): string {
 
 export function detectModel(env: Env): string {
   return env.MODEL_DETECT;
+}
+
+export function auxProvider(env: Env): string {
+  return env.PROVIDER_AUX;
+}
+
+export function auxModel(env: Env): string {
+  return env.MODEL_AUX;
 }
 
 export function cacheTtlSec(env: Env): number {

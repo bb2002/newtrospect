@@ -6,6 +6,8 @@ import { injectStyles } from "./styles.ts";
 import { updateBadge, hideBadge } from "./badge.ts";
 import { bindPopovers, hidePopover } from "./popover.ts";
 import { backgroundFetch } from "./bg-fetch.ts";
+import { renderSummary, removeSummary } from "./cards.ts";
+import { renderCharacter, resetCharacterDismiss } from "./character.ts";
 
 /**
  * 콘텐츠 스크립트 진입.
@@ -78,9 +80,36 @@ async function run(introspectMode = false): Promise<void> {
     if (introspectMode) updateBadge({ phase: "error", done: 0, total: enabledKinds.length, message: "본문 요소 찾을 수 없음" });
     return;
   }
-  bindPopovers(root);
+  bindPopovers(root, {
+    // specs/03 — '온화한 표현으로 보기' 버튼이 사용. 같은 client 의 fetch 경로(=background) 재활용.
+    rewriteSensational: async (text, reason) => {
+      const r = await client.rewriteSensational(text, reason);
+      return r.rewritten;
+    },
+  });
   // 이 시점부터는 둘 다(자동/수동) 진행 상태를 보여준다 — 분석은 몇 초 걸림.
   updateBadge({ phase: "running", done: 0, total: enabledKinds.length });
+
+  // specs/01·04 — summary 와 character 는 본문 위/아래·우측 패널에 별도 렌더.
+  // 4개 span 분석과 병렬로 시작하고, 완료되면 즉시 노출 (서로 독립).
+  const summaryPromise = client
+    .summary(detect.cleanedText)
+    .then((s) => {
+      if (ac.signal.aborted) return;
+      renderSummary(root, s);
+    })
+    .catch(() => {
+      // 조용한 실패 — 본문 분석은 계속 진행.
+    });
+  const characterPromise = client
+    .character(detect.cleanedText)
+    .then((c) => {
+      if (ac.signal.aborted) return;
+      renderCharacter(c);
+    })
+    .catch(() => {
+      // 조용한 실패.
+    });
 
   let done = 0;
   let errors = 0;
@@ -104,6 +133,10 @@ async function run(introspectMode = false): Promise<void> {
       }
     }),
   );
+
+  // span 분석이 끝나도 summary/character 가 늦게 도착할 수 있으니 함께 await.
+  // (이미 시작된 작업이라 별도 대기 비용은 거의 없음.)
+  await Promise.allSettled([summaryPromise, characterPromise]);
 
   if (ac.signal.aborted) return;
   if (errors === enabledKinds.length) {
@@ -191,6 +224,8 @@ function onUrlChange(): void {
   inflight?.abort();
   hideBadge();
   hidePopover();
+  removeSummary();
+  resetCharacterDismiss();
   // SPA가 DOM 을 갱신할 시간을 짧게 준다 — 너무 빨리 추출하면 이전 본문이 잡힘.
   if (runDebounce) clearTimeout(runDebounce);
   runDebounce = setTimeout(() => {
