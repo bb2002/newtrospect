@@ -33,15 +33,21 @@ let popoverOpts: PopoverOptions | null = null;
 let currentTarget: HTMLElement | null = null;
 
 /**
- * popover 시스템 초기화 — opts 만 주입. click listener 는 *각 nts-mark element 에*
- * 직접 단단 (attachMarkClickHandler). 모바일 WebView 에서 document delegation·click 합성이
- * 깨지는 케이스 다 우회. touchend 도 함께 단단 — Android WebView 클릭 누락 대비.
+ * popover 시스템 초기화 — *3중 방어* (절대 회귀 금지, CLAUDE.md 참고).
+ *   1. per-element listener (attachMarkClickHandler)
+ *   2. document capture-phase listener (페이지 stopPropagation 우회 + 백업)
+ *   3. surroundContents 실패 fallback + context payload 에 inline 정보 (highlight.ts)
+ * context bold+밑줄 안 nested inline mark 클릭이 *반드시* 잡혀야 한다.
  */
 export function setupPopovers(opts: PopoverOptions): void {
   popoverOpts = opts;
   ensureStyles();
   document.removeEventListener("click", onDocClick);
   document.addEventListener("click", onDocClick);
+  document.removeEventListener("click", onDocCaptureClick, true);
+  document.addEventListener("click", onDocCaptureClick, true);
+  document.removeEventListener("touchend", onDocCaptureClick, true);
+  document.addEventListener("touchend", onDocCaptureClick, true);
 }
 
 export function attachMarkClickHandler(el: HTMLElement): void {
@@ -50,20 +56,38 @@ export function attachMarkClickHandler(el: HTMLElement): void {
 }
 
 let lastHandledTs = 0;
-function onMarkInteract(ev: Event): void {
+function triggerMark(target: HTMLElement): void {
   const now = Date.now();
   if (now - lastHandledTs < 300) return;
   lastHandledTs = now;
-
-  const target = ev.currentTarget as HTMLElement;
-  ev.stopPropagation();
-  ev.preventDefault();
-
   if (currentTarget === target) {
     hidePopover();
     return;
   }
   showPopover(target);
+}
+
+function onMarkInteract(ev: Event): void {
+  ev.stopPropagation();
+  ev.preventDefault();
+  // currentTarget 보다 *innermost* mark 가 진짜 클릭 대상 — closest 로 redirect.
+  let target = ev.currentTarget as HTMLElement;
+  const innermost = (ev.target as HTMLElement)?.closest?.("nts-mark") as HTMLElement | null;
+  if (innermost && target.contains(innermost) && innermost !== target) {
+    target = innermost;
+  }
+  triggerMark(target);
+}
+
+function onDocCaptureClick(ev: Event): void {
+  const t = ev.target as HTMLElement | null;
+  if (!t) return;
+  if (t.closest?.(`#${POPOVER_ID}`)) return;
+  const mark = t.closest?.("nts-mark") as HTMLElement | null;
+  if (!mark) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  triggerMark(mark);
 }
 
 function onDocClick(ev: MouseEvent): void {

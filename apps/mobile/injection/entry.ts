@@ -186,12 +186,15 @@ async function run(introspect = false): Promise<void> {
     pendingCharacter = null;
   };
 
+  // CRITICAL: applyHighlights 는 *모든 kind spans 한 번에* 받아야 segmentation 정확.
+  // 분리 wrap 하면 term+quantitative 부분 겹침 처리 안 됨 (CLAUDE.md 절대 회귀 금지).
+  const collectedSpans: Span[] = [];
   const spanTasks = enabled.map(async (kind) => {
     try {
       const res = await client.analyze(kind, cleanedText);
       if (ac.signal.aborted) return;
       const relocated = relocateSpansToRoot(res.spans as Span[], cleanedText, root);
-      applyHighlights(root, relocated);
+      collectedSpans.push(...relocated);
       if (kind === "sensational") {
         sensationalSpanCount = (res.spans as Span[]).length;
         sensationalDone = true;
@@ -205,6 +208,11 @@ async function run(introspect = false): Promise<void> {
       }
       tick(true);
     }
+  });
+  // 모든 색깔 분석 도착 후 한 번에 DOM wrap.
+  const wrapTask = Promise.allSettled(spanTasks).then(() => {
+    if (ac.signal.aborted) return;
+    applyHighlights(root, collectedSpans);
   });
 
   const briefingTask = client
@@ -235,7 +243,7 @@ async function run(introspect = false): Promise<void> {
     })
     .catch(() => tick(true));
 
-  await Promise.allSettled([...spanTasks, briefingTask, onelineTask, characterTask]);
+  await Promise.allSettled([wrapTask, briefingTask, onelineTask, characterTask]);
 
   if (pendingCharacter) {
     sensationalDone = true;

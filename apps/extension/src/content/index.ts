@@ -127,13 +127,17 @@ async function run(introspectMode = false): Promise<void> {
     pendingCharacter = null;
   };
 
+  // CRITICAL: applyHighlights 는 *모든 kind spans 한 번에* 받아야 segmentInlineSpans 가
+  // boundary 를 정확히 잘라낼 수 있음. 이전엔 각 kind 분석 도착마다 따로 wrap 해서 term+quantitative
+  // 부분 겹침이 처리 안 됐고 click 도 깨졌음 (CLAUDE.md 절대 회귀 금지 참고).
+  // → 각 task 는 fetch + spans 수집 + tick 까지. *DOM wrap 은 모두 도착 후 한 번*.
+  const collectedSpans: Span[] = [];
   const spanTasks = enabledKinds.map(async (kind) => {
     try {
       const res = await client.analyze(kind, cleanedText);
       if (ac.signal.aborted) return;
-      // 워커가 반환한 spans 는 cleanedText 좌표계 → root.textContent 좌표계로 재매핑.
       const relocated = relocateSpansToRoot(res.spans as Span[], cleanedText, root);
-      applyHighlights(root, relocated);
+      collectedSpans.push(...relocated);
       if (kind === "sensational") {
         sensationalSpanCount = (res.spans as Span[]).length;
         sensationalDone = true;
@@ -147,6 +151,11 @@ async function run(introspectMode = false): Promise<void> {
       }
       tick(true);
     }
+  });
+  // 모든 색깔 분석 도착 후 한 번에 DOM wrap — segmentation 정확성 보장.
+  const wrapTask = Promise.allSettled(spanTasks).then(() => {
+    if (ac.signal.aborted) return;
+    applyHighlights(root, collectedSpans);
   });
 
   const briefingTask = client
@@ -178,7 +187,7 @@ async function run(introspectMode = false): Promise<void> {
     })
     .catch(() => tick(true));
 
-  await Promise.allSettled([...spanTasks, briefingTask, onelineTask, characterTask]);
+  await Promise.allSettled([wrapTask, briefingTask, onelineTask, characterTask]);
 
   // 안전망: character 가 sensational 대기 중에 렌더 안 됐다면 (sensational 실패 등) 강제 렌더.
   if (pendingCharacter) {

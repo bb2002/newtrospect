@@ -10,14 +10,19 @@ export const HIGHLIGHT_STYLES = `
 nts-mark {
   display: inline;
   border-radius: 2px;
-  padding: 0 1px;
+  padding: 0 2px;
   /* 페이지 CSS 가 부모에 pointer-events:none 걸어도 우리 mark 는 클릭 가능. */
   pointer-events: auto !important;
   /* 페이지의 다른 element 가 위에 덮어 클릭 가로채지 못하게. */
   position: relative;
   z-index: 1;
   cursor: pointer;
+  /* 모바일에서 tap highlight 깔끔하게. */
+  -webkit-tap-highlight-color: rgba(0,0,0,0.05);
+  touch-action: manipulation;
 }
+/* nested 자식 mark 는 부모보다 더 위로 — hit-test 시 자식 우선. */
+nts-mark nts-mark { z-index: 2; }
 nts-mark.nts-context {
   font-weight: 700;
   text-decoration: underline;

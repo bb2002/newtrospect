@@ -39,45 +39,69 @@ const POPOVER_PRIORITY: Record<Exclude<AnalysisKind, "context">, number> = {
 let currentTarget: HTMLElement | null = null;
 
 /**
- * popover 시스템 초기화 — opts 만 주입. 실제 click listener 는 *각 nts-mark element 에*
- * 직접 단단 (attachMarkClickHandler) — document delegation 의존성 제거.
+ * popover 시스템 초기화 — *3중 방어* (절대 회귀 금지, CLAUDE.md 참고).
  *
- * 왜 per-element 인가:
- *   - 페이지 자체 script 가 stopPropagation 으로 bubble 을 가로채는 사이트가 있음
- *   - 모바일 WebView 에서 click 이 touch 로부터 합성 안 되는 케이스가 있음
- *   - context bold+밑줄 안에 nested 된 inline mark 가 hit-test 안 잡히는 보고
- *   → element 자체에 listener 면 위 케이스 다 우회.
+ *   1. per-element listener: attachMarkClickHandler — 각 wrap 시 단단
+ *   2. document capture-phase listener: 페이지 stopPropagation 우회 + per-element 누락 백업
+ *   3. surroundContents 실패 시 splitText fallback (highlight.ts) + context payload 에 inline 정보
+ *
+ * context (bold+밑줄) 영역 안에 inline mark 가 nested 됐을 때 클릭이 *반드시* 잡혀야 한다.
+ * 이 동작은 회귀시키지 말 것. 변경 전 CLAUDE.md "절대 회귀 금지" 섹션 확인.
  */
 export function setupPopovers(opts: PopoverOptions): void {
   popoverOpts = opts;
   ensureStyles();
+  // bubble — popover 바깥 클릭 시 닫기.
   document.removeEventListener("click", onDocClick);
   document.addEventListener("click", onDocClick);
+  // capture — 페이지 자체 script 가 click 을 stopPropagation 으로 가로채는 사이트 우회 + 백업.
+  document.removeEventListener("click", onDocCaptureClick, true);
+  document.addEventListener("click", onDocCaptureClick, true);
+  document.removeEventListener("touchend", onDocCaptureClick, true);
+  document.addEventListener("touchend", onDocCaptureClick, true);
 }
 
 /** highlight.ts 가 wrap 직후 호출 — 각 mark 에 click+touch listener 단단. */
 export function attachMarkClickHandler(el: HTMLElement): void {
   el.addEventListener("click", onMarkInteract);
-  // touch 가 click 으로 합성 안 되는 일부 WebView 대비. passive:false 로 preventDefault 가능.
   el.addEventListener("touchend", onMarkInteract, { passive: false });
 }
 
 let lastHandledTs = 0;
-function onMarkInteract(ev: Event): void {
-  // click + touchend 가 모두 발생하는 정상 case 의 double-trigger dedupe.
+function triggerMark(target: HTMLElement): void {
   const now = Date.now();
   if (now - lastHandledTs < 300) return;
   lastHandledTs = now;
-
-  const target = ev.currentTarget as HTMLElement;
-  ev.stopPropagation();
-  ev.preventDefault();
-
   if (currentTarget === target) {
     hidePopover();
     return;
   }
   showPopover(target);
+}
+
+function onMarkInteract(ev: Event): void {
+  ev.stopPropagation();
+  ev.preventDefault();
+  // currentTarget = listener 단단된 element. 그러나 *자식 nested mark*가 hit 인데
+  // 부모 mark 의 listener 만 trigger 된 케이스도 있음 — target.closest 로 innermost 찾아 redirect.
+  let target = ev.currentTarget as HTMLElement;
+  const innermost = (ev.target as HTMLElement)?.closest?.("nts-mark") as HTMLElement | null;
+  if (innermost && target.contains(innermost) && innermost !== target) {
+    target = innermost;
+  }
+  triggerMark(target);
+}
+
+/** capture phase document listener — per-element 누락·페이지 stopPropagation 백업. */
+function onDocCaptureClick(ev: Event): void {
+  const t = ev.target as HTMLElement | null;
+  if (!t) return;
+  if (t.closest?.(`#${POPOVER_ID}`)) return;
+  const mark = t.closest?.("nts-mark") as HTMLElement | null;
+  if (!mark) return;
+  ev.stopPropagation();
+  ev.preventDefault();
+  triggerMark(mark);
 }
 
 function onDocClick(ev: MouseEvent): void {
@@ -87,7 +111,7 @@ function onDocClick(ev: MouseEvent): void {
   hidePopover();
 }
 
-/** @deprecated setupPopovers + attachMarkClickHandler 사용. 하위 호환용. */
+/** @deprecated setupPopovers + attachMarkClickHandler 사용. */
 export function bindPopovers(_root: Element, opts: PopoverOptions): void {
   setupPopovers(opts);
 }

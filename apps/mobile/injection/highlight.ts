@@ -29,36 +29,45 @@ interface MergedMark {
 }
 
 /**
- * 파랑(term)·초록(quantitative) 영역이 겹치면 초록 쪽을 제거.
- * 같은 위치에 두 색이 동시에 그려지면 사용자가 어느 popover 가 뜰지 헷갈리는 버그 방지.
+ * inline spans → non-overlapping segments. extension highlight.ts 미러.
+ * term+quantitative 부분 겹침 시 비-겹친 quantitative 영역이 *초록으로 살아남도록*.
  */
-function suppressTermQuantitativeOverlap(spans: Span[]): Span[] {
-  const terms = spans.filter((s) => s.kind === "term");
-  if (terms.length === 0) return spans;
-  return spans.filter((s) => {
-    if (s.kind !== "quantitative") return true;
-    for (const t of terms) {
-      if (s.start < t.end && s.end > t.start) return false;
+function segmentInlineSpans(spans: Span[]): MergedMark[] {
+  if (spans.length === 0) return [];
+  const boundaries = new Set<number>();
+  for (const s of spans) {
+    boundaries.add(s.start);
+    boundaries.add(s.end);
+  }
+  const sorted = Array.from(boundaries).sort((a, b) => a - b);
+  const segments: MergedMark[] = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const segStart = sorted[i]!;
+    const segEnd = sorted[i + 1]!;
+    if (segStart >= segEnd) continue;
+    const overlapping = spans.filter((s) => s.start < segEnd && s.end > segStart);
+    if (overlapping.length === 0) continue;
+    let primary: AnalysisKind = overlapping[0]!.kind;
+    for (const s of overlapping) {
+      if (s.kind === "context" || primary === "context") continue;
+      const sp = INLINE_PRIORITY[s.kind as Exclude<AnalysisKind, "context">];
+      const pp = INLINE_PRIORITY[primary as Exclude<AnalysisKind, "context">];
+      if (sp < pp) primary = s.kind;
     }
-    return true;
-  });
+    segments.push({ start: segStart, end: segEnd, primary, all: overlapping });
+  }
+  return segments;
 }
 
-function mergeInlineOverlaps(spans: Span[]): MergedMark[] {
+function mergeContextOverlaps(spans: Span[]): MergedMark[] {
   if (spans.length === 0) return [];
   const sorted = [...spans].sort((a, b) => a.start - b.start || a.end - b.end);
   const out: MergedMark[] = [];
-
   for (const s of sorted) {
     const last = out[out.length - 1];
     if (last && s.start < last.end) {
       last.end = Math.max(last.end, s.end);
       last.all.push(s);
-      if (s.kind !== "context" && last.primary !== "context") {
-        const sp = INLINE_PRIORITY[s.kind as Exclude<AnalysisKind, "context">];
-        const lp = INLINE_PRIORITY[last.primary as Exclude<AnalysisKind, "context">];
-        if (sp < lp) last.primary = s.kind;
-      }
     } else {
       out.push({ start: s.start, end: s.end, primary: s.kind, all: [s] });
     }
@@ -111,12 +120,11 @@ function cpRangeToUtf16(text: string, cpStart: number, cpEnd: number): { start: 
 
 export function applyHighlights(root: Element, spans: Span[]): void {
   const contextSpans = spans.filter((s): s is Extract<Span, { kind: "context" }> => s.kind === "context");
-  const inlineSpans = suppressTermQuantitativeOverlap(spans.filter((s) => s.kind !== "context"));
+  const inlineSpans = spans.filter((s) => s.kind !== "context");
 
-  // Pass 1: context (bold+밑줄) wrap. payload 에 *겹치는 inline spans 도 저장* —
-  // Pass 2 의 inline wrap 이 partial-coverage 로 실패해도 click 이 context 에 떨어지면 popover 정상.
+  // Pass 1: context wrap. payload 에 겹치는 inline spans 도 저장 (CLAUDE.md 회귀 금지).
   if (contextSpans.length > 0) {
-    const merged = mergeInlineOverlaps(contextSpans);
+    const merged = mergeContextOverlaps(contextSpans);
     for (const mark of merged) {
       for (const inline of inlineSpans) {
         if (inline.start < mark.end && inline.end > mark.start) {
@@ -128,10 +136,11 @@ export function applyHighlights(root: Element, spans: Span[]): void {
     for (const mark of merged.slice().reverse()) applyMark(pieces, mark);
   }
 
+  // Pass 2: inline 강조 — interval segmentation (term+quantitative 비-겹친 영역 보존).
   if (inlineSpans.length > 0) {
-    const merged = mergeInlineOverlaps(inlineSpans);
+    const segments = segmentInlineSpans(inlineSpans);
     const { pieces } = collectTextPieces(root);
-    for (const mark of merged.slice().reverse()) applyMark(pieces, mark);
+    for (const mark of segments.slice().reverse()) applyMark(pieces, mark);
   }
 }
 

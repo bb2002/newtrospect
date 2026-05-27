@@ -8,12 +8,15 @@ export const HIGHLIGHT_STYLES = `
 nts-mark {
   display: inline;
   border-radius: 2px;
-  padding: 0 1px;
+  padding: 0 2px;
   pointer-events: auto !important;
   position: relative;
   z-index: 1;
   cursor: pointer;
+  -webkit-tap-highlight-color: rgba(0,0,0,0.05);
+  touch-action: manipulation;
 }
+nts-mark nts-mark { z-index: 2; }
 nts-mark.nts-context {
   font-weight: 700;
   text-decoration: underline;
