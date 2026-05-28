@@ -58,3 +58,9 @@ coverage/
 *.tmp
 .cache/
 .gstack/
+
+# harness 중간 산출물 (newtrospect-tune)
+_workspace/
+_workspace_prev/
+apps/worker/fixtures/news/
+apps/worker/fixtures/non-news/

@@ -41,6 +41,23 @@ newtrospect = AI 기반 비판적 뉴스 읽기 보조 도구.
 
 서버: Cloudflare Workers + Workers AI(시작) → Gemini API(스왑 가능) + D1.
 
+## 하네스: 프롬프트 튜닝
+
+**목표:** 데이터 수집(daum/naver/zum 무작위 → 뉴스/비뉴스 100+100) → 본문 추출 fixture → 7기능(detect·사전지식·편파(빨강)·중요문장(노랑)·어려운용어(파랑)·검색필요수치(초록)·한줄요약) gold 논의 + 프롬프트/모델 튜닝을 /goal(95%)까지 반복 → API 연동성 QA.
+
+**트리거:** "사이클 시작"·프롬프트 튜닝·뉴스 판단/마킹 정확도 개선·특정 기능 재튜닝 요청 시 `newtrospect-tune` 스킬을 사용하라. 단순 질문은 직접 응답 가능. (에이전트/스킬 목록은 `.claude/agents`·`.claude/skills` 에서 관리 — 여기 중복 기재 안 함.)
+
+**전제:** 서버는 HTML 이 아니라 *클라이언트 추출 본문 text* 를 받는다(코드포인트 좌표계). 기존 프롬프트는 참고하지 않고 from scratch 작성. 빠른 모델(Gemini flash 계열/Workers AI)만 사용. `rewrite_sensational` 은 제거 대상.
+
+**⚠️ 전수 평가 강제 규칙:** 평가·구현 과정에서 수집한 *전체*(detect 200개 = 뉴스 100 + 비뉴스 100, F2~F7 = 뉴스 100)를 **반드시 다 사용**한다. 샘플링·일부 추출로 점수를 내는 꼼수 금지. 종료는 Phase E 감사 게이트가 강제 — coverage 100%(gold·평가 누락 0) 확인 전 사이클 종료 불가. 정본: `.claude/skills/newtrospect-tune/references/features.md`.
+
+**변경 이력:**
+| 날짜 | 변경 내용 | 대상 | 사유 |
+|------|----------|------|------|
+| 2026-05-28 | 초기 구성 (에이전트 6 + 스킬 7) | 전체 | 프롬프트 개선 하네스 셋업 |
+| 2026-05-28 | 전수 평가 강제 규칙 + Phase E 감사 게이트 | features.md·오케스트레이터·eval/gold 문서·collect-responses.ts | 샘플링 꼼수 금지·전수 사용 강제 (사용자 지시) |
+| 2026-05-28 | 4개 업그레이드: judge 2-합의+캘리브레이션 / 수집 라벨 더블체크 / 결과 버전 태깅·회귀 추적 / 튜닝 루프 자동화(라운드 상한·모델 스윕) | eval-feature·eval-judge·collect-news-data·data-collector·tune-prompt·prompt-tuner·오케스트레이터·collect-responses.ts | 평가 신뢰도·gold 무결성·재현성·루프 효율 강화 |
+
 ## 현재 상태 (2026-05-21)
 
 - **Phase**: 스캐폴딩 + S2 spike 완료. 채택 모델 `@cf/meta/llama-3.1-8b-instruct`. D1 생성·로컬+원격 마이그레이션 완료.
